@@ -1,0 +1,24 @@
+<section class="page-head">
+  <h1>标签：#{{ active_tag }}</h1>
+  <p class="muted"><a href="/tags/">&larr; 返回全部标签</a></p>
+</section>
+
+<section class="post-list">
+  {{#posts}}
+  <article class="post-card">
+    <div class="post-meta">
+      <time>{{ date }}</time>
+      <span>&middot;</span>
+      <span>约 {{ read_min }} 分钟阅读</span>
+    </div>
+    <h2 class="post-card-title">
+      <a href="/post/{{ slug }}/">{{ title }}</a>
+    </h2>
+    <p class="post-summary">{{ summary }}</p>
+    <div class="tag-row">{{{ tags_html }}}</div>
+  </article>
+  {{/posts}}
+  {{^posts}}
+  <div class="empty-state">该标签下暂无文章。</div>
+  {{/posts}}
+</section>

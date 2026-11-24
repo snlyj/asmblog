@@ -1,0 +1,43 @@
+<div id="pjax-loader" class="pjax-loader" aria-hidden="true"></div>
+<div class="progress-shell" aria-hidden="true">
+  <div id="progress-fill" class="progress-fill"></div>
+</div>
+
+<header class="site-header">
+  <div class="nav-pill">
+    <a class="brand" href="/">
+      <span class="brand-emblem" aria-hidden="true">
+        <svg viewBox="0 0 36 36" width="26" height="26">
+          <defs>
+            <linearGradient id="rb" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#74C7FF"/>
+              <stop offset="100%" stop-color="#FFA3CD"/>
+            </linearGradient>
+          </defs>
+          <path d="M18 5 L20.8 13.2 L29 16 L20.8 18.8 L18 27 L15.2 18.8 L7 16 L15.2 13.2 Z" fill="url(#rb)"/>
+          <path d="M13 24 C10 27 8 30 9 32 C12 31 15 28 18 26 C21 28 24 31 27 32 C28 30 26 27 23 24" fill="none" stroke="#FF9EC7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="28" cy="9" r="2.2" fill="#FFE082"/>
+        </svg>
+      </span>
+      <span class="brand-name">{{ site_name }}</span>
+    </a>
+
+    <nav class="nav" id="primary-nav" aria-label="Primary">
+      <span id="nav-slider" class="nav-slider" aria-hidden="true"></span>
+      <a href="/" data-nav="/">首页</a>
+      <a href="/archive/" data-nav="/archive">归档</a>
+      <a href="/tags/" data-nav="/tags">标签</a>
+      <a href="/search/" data-nav="/search">搜索</a>
+      <a href="/rss.xml" class="nav-rss" data-no-pjax="true">RSS</a>
+    </nav>
+
+    <div class="nav-actions">
+      <button id="fx-toggle" class="icon-btn" type="button" title="开关点击星光动效" aria-label="开关星光动效">✦</button>
+      <button id="theme-toggle" class="theme-switch" type="button" title="切换晴空 / 星河夜间模式" aria-label="切换昼夜主题">
+        <span class="switch-icon switch-sun" aria-hidden="true">☀</span>
+        <span class="switch-icon switch-moon" aria-hidden="true">☾</span>
+        <span class="switch-thumb" aria-hidden="true"></span>
+      </button>
+    </div>
+  </div>
+</header>

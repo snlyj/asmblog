@@ -1,0 +1,31 @@
+<section class="page-head">
+  <h1>站内搜索</h1>
+  <p class="muted">支持纯静态实时索引检索（按 <code>/</code> 快速聚焦）</p>
+</section>
+
+<form action="/search/" method="get" class="search-bar">
+  <input id="search-input" type="search" name="q" value="{{ query }}" placeholder="输入关键词搜索标题、摘要或标签..." autocomplete="off" autofocus>
+  <button type="submit">搜索</button>
+</form>
+
+<section id="search-results" class="post-list">
+  {{#posts}}
+  <article class="post-card">
+    <div class="post-meta">
+      <time>{{ date }}</time>
+      <span>&middot;</span>
+      <span>约 {{ read_min }} 分钟阅读</span>
+    </div>
+    <h2 class="post-card-title">
+      <a href="/post/{{ slug }}/">{{ title }}</a>
+    </h2>
+    <p class="post-summary">{{ summary }}</p>
+    <div class="tag-row">{{{ tags_html }}}</div>
+  </article>
+  {{/posts}}
+  {{^posts}}
+  {{#query}}
+  <div class="empty-state">没有找到与「{{ query }}」相关的文章。</div>
+  {{/query}}
+  {{/posts}}
+</section>

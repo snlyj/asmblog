@@ -1,0 +1,6 @@
+# Copy to Caddyfile and replace with your own domain (or <name>.<your-ip>.sslip.io)
+your-domain.example {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=15552000; includeSubDomains"
+	reverse_proxy asmblog:8080
+}

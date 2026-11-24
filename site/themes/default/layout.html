@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }} &middot; {{ site_name }}</title>
+  <meta name="description" content="{{ site_subtitle }}">
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+  <link rel="alternate" type="application/rss+xml" title="{{ site_name }} RSS" href="/rss.xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    (function(){
+      var t = localStorage.getItem('asmblog-theme');
+      if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  {{> header }}
+  <main class="container main-content">
+    {{{ body }}}
+  </main>
+  {{> footer }}
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

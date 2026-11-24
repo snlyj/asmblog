@@ -1,0 +1,84 @@
+<section class="hero-card reveal">
+  <div class="hero-banner-wrap">
+    <img class="hero-banner-img" src="{{ banner_url }}" width="1376" height="768" alt="{{ site_name }}" loading="eager" decoding="async">
+    <svg class="cloud-wave" viewBox="0 0 1200 110" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0,110 L0,68 C45,42 95,42 135,66 C168,36 225,30 272,58 C312,26 378,24 422,56 C468,28 530,26 575,58 C625,22 695,24 742,56 C788,28 848,30 890,60 C936,30 1002,30 1048,60 C1094,38 1152,40 1200,66 L1200,110 Z"/>
+    </svg>
+  </div>
+
+  <div class="hero-profile">
+    <div class="avatar-ring">
+      <span class="avatar-bow" aria-hidden="true">
+        <svg viewBox="0 0 40 28" width="32" height="22">
+          <path d="M20 13 C14 5 4 4 3 12 C2 19 11 20 18 15 Z" fill="#FF9EC7" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M20 13 C26 5 36 4 37 12 C38 19 29 20 22 15 Z" fill="#FF9EC7" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M17 15 L11 25 L16 23 L19 17 M23 15 L29 25 L24 23 L21 17" fill="#FF85BC" stroke="#ffffff" stroke-width="1.4" stroke-linejoin="round"/>
+          <circle cx="20" cy="14" r="4" fill="#FFD1E6" stroke="#ffffff" stroke-width="1.6"/>
+        </svg>
+      </span>
+      <img class="avatar-img" src="{{ avatar_url }}" width="1024" height="1024" alt="{{ author }}" decoding="async">
+    </div>
+    <h1 class="hero-title">{{ site_name }}</h1>
+    <p class="hero-sub">{{ site_subtitle }}</p>
+    <div class="hero-badges">
+      <span class="candy-badge candy-sky">✦ {{ author }}</span>
+      <span class="candy-badge candy-pink">{{ post_count }} 篇文章</span>
+      <span class="candy-badge candy-lemon">{{ tag_count }} 个标签</span>
+    </div>
+  </div>
+</section>
+
+<div class="feed-wrap">
+  <nav class="cat-bar reveal" aria-label="文章分类">
+    <a class="cat-pill is-active" href="/">✦ 全部</a>
+    {{#categories}}
+    <a class="cat-pill" href="/category/{{ name }}/">{{ name }} <span class="cat-pill-cnt">{{ count }}</span></a>
+    {{/categories}}
+  </nav>
+
+  <section class="post-list">
+    {{#posts}}
+    <article class="post-card reveal">
+      <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+      {{#cover}}
+      <a class="post-cover-link" href="/post/{{ slug }}/">
+        <img class="post-cover" src="{{ cover }}" alt="{{ title }}" loading="lazy" decoding="async">
+      </a>
+      {{/cover}}
+      <div class="post-meta">
+        {{#category}}<a class="cat-badge" href="/category/{{ category }}/">✦ {{ category }}</a>{{/category}}
+        <time>{{ date }}</time>
+        <span class="meta-dot">✦</span>
+        <span>约 {{ read_min }} 分钟阅读</span>
+      </div>
+      <h2 class="post-card-title">
+        <a href="/post/{{ slug }}/">{{ title }}</a>
+      </h2>
+      <p class="post-summary">{{ summary }}</p>
+      <div class="post-card-foot">
+        <div class="tag-row">{{{ tags_html }}}</div>
+        <a class="read-more" href="/post/{{ slug }}/">阅读全文 <span aria-hidden="true">&rarr;</span></a>
+      </div>
+    </article>
+    {{/posts}}
+    {{^posts}}
+    <div class="empty-state reveal">
+      <p>晴空下还没有写下第一篇笔记哦～</p>
+    </div>
+    {{/posts}}
+  </section>
+
+  <nav class="pager reveal" aria-label="Pagination">
+    <div class="pager-slot">
+      {{#prev_page_url}}
+      <a class="pager-btn" href="{{ prev_page_url }}">&larr; 上一页</a>
+      {{/prev_page_url}}
+    </div>
+    <span class="pager-info">✦ 第 {{ page_num }} / {{ total_pages }} 页 ✦</span>
+    <div class="pager-slot pager-right">
+      {{#next_page_url}}
+      <a class="pager-btn" href="{{ next_page_url }}">下一页 &rarr;</a>
+      {{/next_page_url}}
+    </div>
+  </nav>
+</div>

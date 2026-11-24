@@ -1,0 +1,49 @@
+<div class="feed-wrap">
+  <article class="article-card reveal">
+    <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+    <header class="article-header">
+      <div class="article-crumb">
+        <a href="/">&larr; 返回晴空首页</a>
+        {{#category}}<a class="cat-badge" href="/category/{{ category }}/">✦ {{ category }}</a>{{/category}}
+      </div>
+      <div class="post-meta">
+        <time>{{ date }}</time>
+        <span class="meta-dot">✦</span>
+        <span>约 {{ read_min }} 分钟阅读</span>
+        <span class="meta-dot">✦</span>
+        <span>{{ author }}</span>
+      </div>
+      <h1 class="article-title">{{ title }}</h1>
+      <div class="tag-row">{{{ tags_html }}}</div>
+    </header>
+
+    {{#cover}}
+    <figure class="article-cover-wrap">
+      <img class="article-cover" src="{{ cover }}" alt="{{ title }}" decoding="async">
+    </figure>
+    {{/cover}}
+
+    <div class="prose">
+      {{{ content_html }}}
+    </div>
+  </article>
+
+  <nav class="post-nav reveal" aria-label="Adjacent Posts">
+    <div class="post-nav-slot">
+      {{#prev_slug}}
+      <a class="post-nav-card" href="/post/{{ prev_slug }}/">
+        <span class="post-nav-label">&larr; 上一篇</span>
+        <span class="post-nav-title">{{ prev_title }}</span>
+      </a>
+      {{/prev_slug}}
+    </div>
+    <div class="post-nav-slot">
+      {{#next_slug}}
+      <a class="post-nav-card post-nav-right" href="/post/{{ next_slug }}/">
+        <span class="post-nav-label">下一篇 &rarr;</span>
+        <span class="post-nav-title">{{ next_title }}</span>
+      </a>
+      {{/next_slug}}
+    </div>
+  </nav>
+</div>

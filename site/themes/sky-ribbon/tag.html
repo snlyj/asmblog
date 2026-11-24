@@ -1,0 +1,38 @@
+<div class="feed-wrap">
+  <section class="page-head-card reveal">
+    <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+    <span class="candy-badge candy-lemon">✦ TAG COLLECTION</span>
+    <h1>#{{ active_tag }}</h1>
+    <p class="muted"><a href="/tags/">&larr; 返回全部糖果标签</a></p>
+  </section>
+
+  <section class="post-list">
+    {{#posts}}
+    <article class="post-card reveal">
+      <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+      {{#cover}}
+      <a class="post-cover-link" href="/post/{{ slug }}/">
+        <img class="post-cover" src="{{ cover }}" alt="{{ title }}" loading="lazy" decoding="async">
+      </a>
+      {{/cover}}
+      <div class="post-meta">
+        {{#category}}<a class="cat-badge" href="/category/{{ category }}/">✦ {{ category }}</a>{{/category}}
+        <time>{{ date }}</time>
+        <span class="meta-dot">✦</span>
+        <span>约 {{ read_min }} 分钟阅读</span>
+      </div>
+      <h2 class="post-card-title">
+        <a href="/post/{{ slug }}/">{{ title }}</a>
+      </h2>
+      <p class="post-summary">{{ summary }}</p>
+      <div class="post-card-foot">
+        <div class="tag-row">{{{ tags_html }}}</div>
+        <a class="read-more" href="/post/{{ slug }}/">阅读全文 <span aria-hidden="true">&rarr;</span></a>
+      </div>
+    </article>
+    {{/posts}}
+    {{^posts}}
+    <div class="empty-state reveal">这个标签下还没有文章哦～</div>
+    {{/posts}}
+  </section>
+</div>

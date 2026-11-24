@@ -1,0 +1,1947 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>✦ 作者写作室 · AsmBlog Studio</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon-ribbon.svg?v=2">
+  <script>
+    (function(){
+      var t = localStorage.getItem('jiehua-theme');
+      if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+      document.documentElement.setAttribute('data-theme', t || 'light');
+    })();
+  </script>
+  <style>
+    :root {
+      --bg: #f6fbff;
+      --surface: #ffffff;
+      --surface-soft: #f2f8ff;
+      --fg: #1d2d44;
+      --fg-2: #445873;
+      --muted: #7a8fa8;
+      --border: #d8ecff;
+      --border-strong: #b4ddff;
+      --sky: #5cb8ff;
+      --sky-soft: #e3f3ff;
+      --sky-fg: #0369a1;
+      --pink: #ff94c2;
+      --pink-soft: #ffe8f3;
+      --pink-fg: #be185d;
+      --lilac-soft: #f1ecff;
+      --lilac-fg: #6d28d9;
+      --danger: #e11d48;
+      --danger-soft: #ffe4e6;
+      --ok: #059669;
+      --ok-soft: #d1fae5;
+      --shadow: 0 10px 26px -12px rgba(72, 152, 232, 0.24);
+    }
+    [data-theme="dark"] {
+      --bg: #0f182c;
+      --surface: #17233e;
+      --surface-soft: #1e2d4f;
+      --fg: #eef5ff;
+      --fg-2: #bfd2ec;
+      --muted: #88a0c2;
+      --border: rgba(130, 192, 255, 0.22);
+      --border-strong: rgba(255, 166, 210, 0.42);
+      --sky-soft: rgba(116, 201, 255, 0.16);
+      --sky-fg: #8dd6ff;
+      --pink-soft: rgba(255, 163, 206, 0.16);
+      --pink-fg: #ffb5d8;
+      --lilac-soft: rgba(199, 184, 255, 0.16);
+      --lilac-fg: #d7cbff;
+      --danger: #fb7185;
+      --danger-soft: rgba(251, 113, 133, 0.18);
+      --ok: #34d399;
+      --ok-soft: rgba(52, 211, 153, 0.16);
+      --shadow: 0 12px 28px -12px rgba(2, 6, 23, 0.6);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100svh;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(640px 400px at 10% 0%, rgba(110, 193, 255, 0.18), transparent 72%),
+        radial-gradient(560px 380px at 92% 10%, rgba(255, 158, 199, 0.15), transparent 72%);
+      background-repeat: no-repeat;
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    a { color: var(--sky-fg); text-decoration: none; }
+    button, input, select, textarea { font-family: inherit; }
+    .hidden { display: none !important; }
+
+    /* Login Gate */
+    .gate-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .gate-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 26px;
+      padding: 32px 28px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .gate-avatar {
+      width: 78px;
+      height: 78px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--pink);
+      margin: 0 auto 12px;
+      display: block;
+    }
+    .gate-card h1 { margin: 0 0 6px; font-size: 1.32rem; }
+    .gate-sub { margin: 0 0 20px; color: var(--muted); font-size: 0.88rem; }
+    .gate-form { display: flex; flex-direction: column; gap: 12px; }
+
+    /* Inputs & Buttons */
+    .inp, .sel, .txt {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--fg);
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .inp:focus, .sel:focus, .txt:focus {
+      border-color: var(--sky);
+      box-shadow: 0 0 0 3px rgba(92, 184, 255, 0.2);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--fg);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.16s ease, opacity 0.16s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .btn:hover { border-color: var(--sky); transform: translateY(-1px); }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+    .btn-primary {
+      border: none;
+      background: linear-gradient(120deg, #5cb8ff, #ff94c2);
+      color: #ffffff;
+      box-shadow: 0 6px 16px -6px rgba(92, 184, 255, 0.55);
+    }
+    .btn-primary:hover { opacity: 0.94; }
+    .btn-soft { background: var(--sky-soft); border-color: transparent; color: var(--sky-fg); }
+    .btn-pink { background: var(--pink-soft); border-color: transparent; color: var(--pink-fg); }
+    .btn-danger { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
+    .btn-sm { padding: 6px 12px; font-size: 0.82rem; }
+
+    /* Shell */
+    .studio-shell {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 18px 18px 48px;
+    }
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+    .top-brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--fg);
+    }
+    .top-brand img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 2px solid var(--pink); }
+    .tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      padding: 7px 15px;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: var(--fg-2);
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+    }
+    .tab-btn.is-active {
+      background: linear-gradient(120deg, var(--sky-soft), var(--pink-soft));
+      color: var(--sky-fg);
+    }
+    .top-actions { display: flex; align-items: center; gap: 8px; }
+
+    /* Panels */
+    .panel {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 24px;
+      padding: 22px 24px;
+      box-shadow: var(--shadow);
+    }
+    .panel-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1.5px dashed var(--border);
+    }
+    .panel-title { margin: 0; font-size: 1.18rem; display: flex; align-items: center; gap: 8px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      background: var(--sky-soft);
+      color: var(--sky-fg);
+    }
+    .badge-pink { background: var(--pink-soft); color: var(--pink-fg); }
+    .badge-lilac { background: var(--lilac-soft); color: var(--lilac-fg); }
+    .badge-draft { background: var(--danger-soft); color: var(--danger); }
+
+    /* Editor Form Grid */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field-full { grid-column: 1 / -1; }
+    .field label { font-size: 0.84rem; font-weight: 700; color: var(--fg-2); }
+    .field-hint { font-size: 0.78rem; color: var(--muted); }
+
+    /* Cover Dropzone */
+    .cover-box {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1.5px dashed var(--border-strong);
+      background: var(--surface-soft);
+    }
+    .cover-box.is-drag { border-color: var(--pink); background: var(--pink-soft); }
+    .cover-thumb {
+      width: 192px;
+      aspect-ratio: 16 / 9;
+      height: auto;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      display: block;
+      flex-shrink: 0;
+    }
+    .cover-empty {
+      width: 192px;
+      aspect-ratio: 16 / 9;
+      border-radius: 12px;
+      border: 1.5px dashed var(--border-strong);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Interactive 16:9 Cover Cropper Modal */
+    .crop-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: rgba(15, 24, 44, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+    }
+    .crop-dialog {
+      width: 100%;
+      max-width: 600px;
+      max-height: 92vh;
+      overflow-y: auto;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 24px;
+      padding: 18px 20px 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+    .crop-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .crop-head h3 { margin: 0; font-size: 1.05rem; color: var(--fg); }
+    .crop-tip { margin: 0 0 12px; font-size: 0.82rem; color: var(--muted); }
+    .crop-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border-radius: 16px;
+      border: 2px solid var(--sky);
+      background: #0f182c;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: grab;
+    }
+    .crop-stage.is-dragging { cursor: grabbing; }
+    .crop-stage.is-square {
+      max-width: 340px;
+      margin: 0 auto;
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+    }
+    .crop-stage.is-square .crop-ribbon-hint { display: none; }
+    .set-avatar-thumb {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2.5px solid var(--pink);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .crop-img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+      max-width: none;
+      max-height: none;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .crop-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.28) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.28) 1px, transparent 1px);
+      background-size: 33.333% 33.333%;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+    }
+    .crop-ribbon-hint {
+      position: absolute;
+      top: 10px;
+      right: -32px;
+      width: 100px;
+      height: 20px;
+      transform: rotate(45deg);
+      background: linear-gradient(90deg, rgba(116, 201, 255, 0.78), rgba(255, 158, 199, 0.78));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      color: #fff;
+      font-size: 9px;
+    }
+    .crop-controls {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .crop-zoom-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .crop-zoom-row span { font-size: 0.82rem; font-weight: 700; color: var(--fg-2); min-width: 44px; text-align: center; }
+    .crop-zoom-row input[type="range"] { flex: 1; accent-color: #5cb8ff; cursor: pointer; }
+    .crop-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .crop-actions {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1.5px dashed var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .cover-ctrl { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 8px; }
+    .cover-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+    /* Markdown Editor + Preview */
+    .md-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border: 1.5px solid var(--border);
+      border-bottom: none;
+      border-radius: 16px 16px 0 0;
+      background: var(--surface-soft);
+    }
+    .tb-btn {
+      padding: 5px 11px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--fg);
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .tb-btn:hover { border-color: var(--sky); color: var(--sky-fg); }
+    .tb-btn-img {
+      background: var(--pink-soft);
+      border-color: transparent;
+      color: var(--pink-fg);
+    }
+    .tb-spacer { flex: 1; }
+    .md-split {
+      display: grid;
+      grid-template-columns: 1fr;
+      border: 1.5px solid var(--border);
+      border-radius: 0 0 16px 16px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .md-split.show-preview { grid-template-columns: 1fr 1fr; }
+    .md-area {
+      width: 100%;
+      min-height: 360px;
+      border: none;
+      padding: 14px 16px;
+      background: var(--surface);
+      color: var(--fg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", monospace;
+      font-size: 14.5px;
+      line-height: 1.72;
+      resize: vertical;
+      outline: none;
+    }
+    .md-area.is-drag { background: var(--pink-soft); }
+    .md-preview {
+      padding: 16px 18px;
+      border-left: 1.5px solid var(--border);
+      background: var(--surface);
+      overflow-y: auto;
+      max-height: 540px;
+      word-break: break-word;
+    }
+    .md-preview img { max-width: 100%; border-radius: 14px; display: block; margin: 12px auto; box-shadow: var(--shadow); }
+    .md-preview pre { background: #152038; color: #e6f1ff; padding: 12px 14px; border-radius: 12px; overflow-x: auto; }
+    .md-preview code { background: var(--sky-soft); color: var(--sky-fg); padding: 2px 6px; border-radius: 6px; font-size: 0.88em; }
+    .md-preview pre code { background: transparent; color: inherit; padding: 0; }
+    .md-preview blockquote { margin: 12px 0; padding: 10px 14px; border-left: 4px solid var(--sky); background: var(--sky-soft); border-radius: 4px 12px 12px 4px; }
+    .md-preview h2 { border-bottom: 1.5px solid var(--border); padding-bottom: 6px; }
+
+    .editor-footer {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .draft-chk {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: var(--fg-2);
+      cursor: pointer;
+    }
+
+    /* Posts List */
+    .item-list { display: flex; flex-direction: column; gap: 12px; }
+    .post-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-soft);
+    }
+    .post-row-thumb {
+      width: 92px;
+      height: 58px;
+      border-radius: 10px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+    .post-row-info { flex: 1; min-width: 0; }
+    .post-row-title { font-weight: 800; font-size: 1rem; color: var(--fg); margin: 0 0 4px; overflow-wrap: anywhere; }
+    .post-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); }
+    .post-row-ops { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+
+    /* Category Manager */
+    .cat-add-form { display: flex; gap: 10px; margin-bottom: 18px; }
+    .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .cat-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-soft);
+    }
+    .cat-card-name { font-weight: 800; color: var(--fg); }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(16px);
+      z-index: 999;
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: var(--fg);
+      color: var(--bg);
+      font-size: 0.88rem;
+      font-weight: 700;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.24s ease, transform 0.24s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .toast.is-shown { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+    .toast.is-err { background: var(--danger); color: #ffffff; }
+    .toast a { color: #ffd86b; text-decoration: underline; }
+
+    @media (max-width: 720px) {
+      .studio-shell { padding: 12px 12px 36px; }
+      .topbar { border-radius: 22px; padding: 12px; }
+      .panel { padding: 16px; border-radius: 20px; }
+      .meta-grid { grid-template-columns: 1fr; }
+      .md-split.show-preview { grid-template-columns: 1fr; }
+      .md-preview { border-left: none; border-top: 1.5px solid var(--border); }
+      .post-row { flex-direction: column; align-items: stretch; }
+      .post-row-thumb { width: 100%; height: 140px; }
+      .post-row-ops { justify-content: flex-end; }
+      .cat-add-form { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Unlock Gate -->
+<div id="gate-view" class="gate-wrap">
+  <div class="gate-card">
+    <img id="gate-avatar" class="gate-avatar" src="/static/avatar.jpg?v=2" alt="Author">
+    <h1>✦ 作者秘密写作室</h1>
+    <p class="gate-sub">仅博主本人可见 · 请输入写作口令解锁</p>
+    <form id="login-form" class="gate-form">
+      <input id="login-pass" class="inp" type="password" placeholder="输入作者口令..." autocomplete="current-password" required>
+      <button id="login-btn" class="btn btn-primary" type="submit">解锁写作室 ✦</button>
+    </form>
+    <p id="login-err" class="field-hint" style="color:var(--danger);margin-top:10px;min-height:1.2em"></p>
+  </div>
+</div>
+
+<!-- Main Studio App -->
+<div id="app-view" class="studio-shell hidden">
+  <header class="topbar">
+    <div class="top-brand">
+      <img id="top-avatar" src="/static/avatar.jpg?v=2" alt="Author">
+      <span id="top-brand-name">✦ 作者写作室</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn is-active" data-tab="write" type="button">✍️ 写文章</button>
+      <button class="tab-btn" data-tab="posts" type="button">📚 文章管理 (<span id="cnt-posts">0</span>)</button>
+      <button class="tab-btn" data-tab="cats" type="button">🏷️ 分类管理 (<span id="cnt-cats">0</span>)</button>
+      <button class="tab-btn" data-tab="settings" type="button">⚙️ 站点设置</button>
+    </nav>
+    <div class="top-actions">
+      <a class="btn btn-soft btn-sm" href="/" target="_blank">访问小站 ↗</a>
+      <button id="logout-btn" class="btn btn-sm" type="button">锁定退出</button>
+    </div>
+  </header>
+
+  <!-- TAB 1: Write / Edit Post -->
+  <section id="tab-write" class="panel">
+    <div class="panel-head">
+      <h2 class="panel-title">
+        <span id="editor-mode-label">✍️ 发布新文章</span>
+        <span id="editor-slug-badge" class="badge hidden"></span>
+      </h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="new-post-btn" class="btn btn-soft btn-sm" type="button">+ 新建空白文章</button>
+      </div>
+    </div>
+
+    <div class="meta-grid">
+      <div class="field field-full">
+        <label for="f-title">文章标题 *</label>
+        <input id="f-title" class="inp" type="text" placeholder="给这篇图文笔记起个可爱的标题吧～">
+      </div>
+
+      <div class="field">
+        <label for="f-cat">选择分类</label>
+        <select id="f-cat" class="sel">
+          <option value="">（未分类）</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="f-tags">标签（多个用英文逗号分隔）</label>
+        <input id="f-tags" class="inp" type="text" placeholder="例如：日常, 插画, 随笔">
+      </div>
+
+      <div class="field">
+        <label for="f-slug">文章网址标识 (Slug，留空将自动生成)</label>
+        <input id="f-slug" class="inp" type="text" placeholder="仅限字母/数字/-/_，如 my-sunny-day">
+      </div>
+
+      <div class="field">
+        <label for="f-date">发布日期</label>
+        <input id="f-date" class="inp" type="date">
+      </div>
+
+      <div class="field field-full">
+        <label for="f-summary">文章摘要（显示在首页卡片上）</label>
+        <input id="f-summary" class="inp" type="text" placeholder="简单写一两句导语，吸引大家点进来～">
+      </div>
+
+      <!-- Cover Image Picker -->
+      <div class="field field-full">
+        <label>文章封面图（选择后可按 16:9 封面框自由拖动/缩放裁剪，所见即所得）</label>
+        <div id="cover-drop" class="cover-box">
+          <img id="cover-preview" class="cover-thumb hidden" src="" alt="封面预览">
+          <div id="cover-placeholder" class="cover-empty">尚未设置封面图<br>点击上传即可裁剪</div>
+          <div class="cover-ctrl">
+            <div class="cover-btns">
+              <button id="cover-upload-btn" class="btn btn-pink btn-sm" type="button">🖼️ 选择并裁剪封面</button>
+              <button id="cover-recrop-btn" class="btn btn-soft btn-sm hidden" type="button">✂️ 重新裁剪</button>
+              <button id="cover-clear-btn" class="btn btn-sm hidden" type="button">移除封面</button>
+              <span id="cover-status" class="field-hint"></span>
+            </div>
+            <input id="f-cover" class="inp" type="text" placeholder="裁剪上传后自动填入 /uploads/... ，也可直接粘贴图片链接">
+          </div>
+          <input id="cover-file" type="file" accept="image/*" class="hidden">
+        </div>
+      </div>
+    </div>
+
+    <!-- Markdown + Image Editor -->
+    <div class="field">
+      <label for="f-content">正文内容（Markdown 图文 · 支持点击插图、拖拽图片、Ctrl+V 粘贴截图）</label>
+      <div class="md-toolbar">
+        <button id="tb-img" class="tb-btn tb-btn-img" type="button">🖼️ 插入图片</button>
+        <button class="tb-btn" data-md="h2" type="button">H2 标题</button>
+        <button class="tb-btn" data-md="bold" type="button"><b>B</b> 粗体</button>
+        <button class="tb-btn" data-md="italic" type="button"><i>I</i> 斜体</button>
+        <button class="tb-btn" data-md="quote" type="button">❝ 引用</button>
+        <button class="tb-btn" data-md="code" type="button">&lt;/&gt; 代码块</button>
+        <button class="tb-btn" data-md="link" type="button">🔗 链接</button>
+        <span class="tb-spacer"></span>
+        <span id="img-status" class="field-hint"></span>
+        <button id="tb-preview" class="tb-btn" type="button">👁️ 开启预览</button>
+        <input id="inline-files" type="file" accept="image/*" multiple class="hidden">
+      </div>
+      <div id="md-split" class="md-split">
+        <textarea id="f-content" class="md-area" placeholder="在这里写下今天的心情、故事和图文吧...&#10;&#10;小提示：直接拖入图片或粘贴截图即可自动上传并插入图文！"></textarea>
+        <div id="md-preview" class="md-preview hidden"></div>
+      </div>
+    </div>
+
+    <div class="editor-footer">
+      <label class="draft-chk">
+        <input id="f-draft" type="checkbox">
+        <span>存为草稿（暂不在前台公开显示）</span>
+      </label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button id="save-btn" class="btn btn-primary" type="button">✦ 发布文章</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 2: Posts Management -->
+  <section id="tab-posts" class="panel hidden">
+    <div class="panel-head">
+      <h2 class="panel-title">📚 全部文章管理</h2>
+      <button id="refresh-posts-btn" class="btn btn-soft btn-sm" type="button">↻ 刷新列表</button>
+    </div>
+    <div id="posts-list" class="item-list"></div>
+  </section>
+
+  <!-- TAB 3: Categories Management -->
+  <section id="tab-cats" class="panel hidden">
+    <div class="panel-head">
+      <h2 class="panel-title">🏷️ 帖子分类管理</h2>
+    </div>
+    <form id="cat-add-form" class="cat-add-form">
+      <input id="new-cat-name" class="inp" type="text" maxlength="40" placeholder="输入新分类名称（如：生活手账、番剧感想、摄影相册）..." required>
+      <button class="btn btn-primary" type="submit" style="white-space:nowrap">+ 添加分类</button>
+    </form>
+    <div id="cats-grid" class="cat-grid"></div>
+  </section>
+
+  <!-- TAB 4: Site Appearance & Security Settings -->
+  <section id="tab-settings" class="panel hidden">
+    <div class="panel-head">
+      <h2 class="panel-title">⚙️ 站点外观与安全设置</h2>
+      <span class="badge badge-pink">保存即实时生效 · 无需重启</span>
+    </div>
+
+    <div class="meta-grid">
+      <div class="field">
+        <label for="s-site-name">站点名称 *</label>
+        <input id="s-site-name" class="inp" type="text" placeholder="例如：晴空星梦小站">
+      </div>
+      <div class="field">
+        <label for="s-author">博主昵称 *</label>
+        <input id="s-author" class="inp" type="text" placeholder="例如：Sakura">
+      </div>
+      <div class="field field-full">
+        <label for="s-subtitle">首页副标题 / 个性签名</label>
+        <input id="s-subtitle" class="inp" type="text" placeholder="显示在首页标题下方的一句话">
+      </div>
+      <div class="field field-full">
+        <label for="s-footer">底部护栏文字（留空则隐藏底部护栏）</label>
+        <input id="s-footer" class="inp" type="text" placeholder="例如：Made with ♡ · Pure x86-64 Assembly">
+      </div>
+      <div class="field">
+        <label for="s-site-url">站点公开网址 (用于 RSS / Sitemap)</label>
+        <input id="s-site-url" class="inp" type="text" placeholder="https://your-domain.example">
+      </div>
+      <div class="field">
+        <label for="s-per-page">首页每页文章数 (1–50)</label>
+        <input id="s-per-page" class="inp" type="number" min="1" max="50" value="6">
+      </div>
+
+      <!-- Avatar Picker (1:1 Circle Crop) -->
+      <div class="field field-full">
+        <label>博主头像（支持 1:1 圆形裁剪上传）</label>
+        <div class="cover-box">
+          <img id="s-avatar-preview" class="set-avatar-thumb" src="/static/avatar.jpg?v=2" alt="头像预览">
+          <div class="cover-ctrl">
+            <div class="cover-btns">
+              <button id="s-avatar-btn" class="btn btn-pink btn-sm" type="button">🖼️ 上传并裁剪头像</button>
+              <button id="s-avatar-recrop" class="btn btn-soft btn-sm" type="button">✂️ 重新裁剪</button>
+            </div>
+            <input id="s-avatar-url" class="inp" type="text" placeholder="/static/avatar.jpg?v=2 或 /uploads/...">
+          </div>
+          <input id="s-avatar-file" type="file" accept="image/*" class="hidden">
+        </div>
+      </div>
+
+      <!-- Hero Banner Picker (16:9 Crop) -->
+      <div class="field field-full">
+        <label>首页顶部插画头图（支持 16:9 裁剪上传）</label>
+        <div class="cover-box">
+          <img id="s-banner-preview" class="cover-thumb" src="/static/hero-banner.jpg?v=2" alt="头图预览">
+          <div class="cover-ctrl">
+            <div class="cover-btns">
+              <button id="s-banner-btn" class="btn btn-pink btn-sm" type="button">🖼️ 上传并裁剪头图</button>
+              <button id="s-banner-recrop" class="btn btn-soft btn-sm" type="button">✂️ 重新裁剪</button>
+            </div>
+            <input id="s-banner-url" class="inp" type="text" placeholder="/static/hero-banner.jpg?v=2 或 /uploads/...">
+          </div>
+          <input id="s-banner-file" type="file" accept="image/*" class="hidden">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="s-studio-path">隐藏后台入口路径（防扫默认地址）</label>
+        <input id="s-studio-path" class="inp" type="text" placeholder="/studio">
+        <span class="field-hint">修改后旧路径将返回 404，请记住新入口地址（如 /my-secret-room）</span>
+      </div>
+      <div class="field">
+        <label for="s-new-pass">修改后台口令（留空则保持原口令）</label>
+        <input id="s-new-pass" class="inp" type="password" autocomplete="new-password" placeholder="至少 4 位，修改后其他设备自动下线">
+      </div>
+    </div>
+
+    <div class="editor-footer">
+      <span class="field-hint">所有设置会原子写入 config.ini 并立刻热重载生效。</span>
+      <button id="save-settings-btn" class="btn btn-primary" type="button">✦ 保存站点设置</button>
+    </div>
+  </section>
+</div>
+
+<!-- Interactive Cover / Avatar Cropper Modal -->
+<div id="crop-modal" class="crop-modal hidden" role="dialog" aria-modal="true" aria-label="裁剪图片">
+  <div class="crop-dialog">
+    <div class="crop-head">
+      <h3 id="crop-title">✂️ 自由裁剪文章封面（16:9 封面框）</h3>
+      <button id="crop-close-btn" class="btn btn-sm" type="button">✕</button>
+    </div>
+    <p class="crop-tip">单指 / 鼠标拖动图片移动人物位置，双指捏合、滚轮或下方滑块自由缩放；框内即前台完整显示效果～</p>
+
+    <div id="crop-stage" class="crop-stage">
+      <img id="crop-img" class="crop-img" alt="裁剪预览" draggable="false">
+      <div class="crop-grid" aria-hidden="true"></div>
+      <div class="crop-ribbon-hint" aria-hidden="true">★</div>
+    </div>
+
+    <div class="crop-controls">
+      <div class="crop-zoom-row">
+        <span>缩放</span>
+        <input id="crop-zoom" type="range" min="1" max="3" step="0.01" value="1">
+        <span id="crop-zoom-val">100%</span>
+      </div>
+      <div class="crop-presets">
+        <button id="crop-align-top" class="btn btn-soft btn-sm" type="button">⬆ 顶部对齐（露头部）</button>
+        <button id="crop-align-center" class="btn btn-sm" type="button">◎ 居中对齐</button>
+        <button id="crop-reset" class="btn btn-sm" type="button">↺ 重置</button>
+      </div>
+    </div>
+
+    <div class="crop-actions">
+      <button id="crop-cancel-btn" class="btn btn-sm" type="button">取消</button>
+      <button id="crop-gif-raw-btn" class="btn btn-soft btn-sm hidden" type="button">原图直传(保留动图)</button>
+      <button id="crop-confirm-btn" class="btn btn-primary btn-sm" type="button">✂️ 确认裁剪并上传</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  var gateView = document.getElementById('gate-view');
+  var appView = document.getElementById('app-view');
+  var loginForm = document.getElementById('login-form');
+  var loginPass = document.getElementById('login-pass');
+  var loginErr = document.getElementById('login-err');
+
+  var fTitle = document.getElementById('f-title');
+  var fCat = document.getElementById('f-cat');
+  var fTags = document.getElementById('f-tags');
+  var fSlug = document.getElementById('f-slug');
+  var fDate = document.getElementById('f-date');
+  var fSummary = document.getElementById('f-summary');
+  var fCover = document.getElementById('f-cover');
+  var fContent = document.getElementById('f-content');
+  var fDraft = document.getElementById('f-draft');
+
+  var coverDrop = document.getElementById('cover-drop');
+  var coverFile = document.getElementById('cover-file');
+  var coverPreview = document.getElementById('cover-preview');
+  var coverPlaceholder = document.getElementById('cover-placeholder');
+  var coverRecropBtn = document.getElementById('cover-recrop-btn');
+  var coverClearBtn = document.getElementById('cover-clear-btn');
+  var coverStatus = document.getElementById('cover-status');
+
+  var cropModal = document.getElementById('crop-modal');
+  var cropTitle = document.getElementById('crop-title');
+  var cropStage = document.getElementById('crop-stage');
+  var cropImg = document.getElementById('crop-img');
+  var cropZoom = document.getElementById('crop-zoom');
+  var cropZoomVal = document.getElementById('crop-zoom-val');
+  var cropGifRawBtn = document.getElementById('crop-gif-raw-btn');
+  var cropConfirmBtn = document.getElementById('crop-confirm-btn');
+
+  var inlineFiles = document.getElementById('inline-files');
+  var imgStatus = document.getElementById('img-status');
+  var mdSplit = document.getElementById('md-split');
+  var mdPreview = document.getElementById('md-preview');
+  var tbPreview = document.getElementById('tb-preview');
+
+  var editorModeLabel = document.getElementById('editor-mode-label');
+  var editorSlugBadge = document.getElementById('editor-slug-badge');
+  var saveBtn = document.getElementById('save-btn');
+  var postsList = document.getElementById('posts-list');
+  var catsGrid = document.getElementById('cats-grid');
+  var cntPosts = document.getElementById('cnt-posts');
+  var cntCats = document.getElementById('cnt-cats');
+  var toastEl = document.getElementById('toast');
+
+  var state = { posts: [], cats: [], editingSlug: '', previewOn: false, toastTimer: null };
+
+  function todayStr() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function showToast(html, isErr) {
+    clearTimeout(state.toastTimer);
+    toastEl.innerHTML = html;
+    toastEl.className = 'toast is-shown' + (isErr ? ' is-err' : '');
+    state.toastTimer = setTimeout(function () {
+      toastEl.classList.remove('is-shown');
+    }, 3400);
+  }
+
+  function api(method, url, body) {
+    var opts = { method: method, credentials: 'same-origin', headers: {} };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(url, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (r.status === 401) {
+          showGate();
+          throw new Error(data.error || '请重新登录');
+        }
+        if (!r.ok) throw new Error(data.error || ('请求失败 (' + r.status + ')'));
+        return data;
+      });
+    });
+  }
+
+  function showGate() {
+    appView.classList.add('hidden');
+    gateView.classList.remove('hidden');
+    loginPass.focus();
+  }
+
+  function showApp() {
+    gateView.classList.add('hidden');
+    appView.classList.remove('hidden');
+  }
+
+  /* Tabs */
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(function (b) {
+      b.classList.toggle('is-active', b.getAttribute('data-tab') === name);
+    });
+    document.getElementById('tab-write').classList.toggle('hidden', name !== 'write');
+    document.getElementById('tab-posts').classList.toggle('hidden', name !== 'posts');
+    document.getElementById('tab-cats').classList.toggle('hidden', name !== 'cats');
+    document.getElementById('tab-settings').classList.toggle('hidden', name !== 'settings');
+  }
+  document.querySelectorAll('.tab-btn').forEach(function (b) {
+    b.addEventListener('click', function () { switchTab(b.getAttribute('data-tab')); });
+  });
+
+  /* Cover Preview Sync */
+  function syncCoverUI() {
+    var u = fCover.value.trim();
+    if (u) {
+      coverPreview.src = u;
+      coverPreview.classList.remove('hidden');
+      coverPlaceholder.classList.add('hidden');
+      coverRecropBtn.classList.remove('hidden');
+      coverClearBtn.classList.remove('hidden');
+    } else {
+      coverPreview.src = '';
+      coverPreview.classList.add('hidden');
+      coverPlaceholder.classList.remove('hidden');
+      coverRecropBtn.classList.add('hidden');
+      coverClearBtn.classList.add('hidden');
+    }
+  }
+  fCover.addEventListener('input', syncCoverUI);
+  coverClearBtn.addEventListener('click', function () {
+    fCover.value = '';
+    syncCoverUI();
+  });
+
+  /* Client-side Image Compression (keeps huge phone photos crisp & < 1.8MB) */
+  function prepareImageBlob(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+        reject(new Error('请选择图片文件（JPG / PNG / GIF / WebP）'));
+        return;
+      }
+      // Keep GIF (preserve animation) or small images <= 1.2MB directly as-is
+      if (file.type === 'image/gif' || file.size <= 1200000) {
+        if (file.size > 1900000) {
+          reject(new Error('GIF 动图超过 1.9MB 限制，请压缩后再上传'));
+          return;
+        }
+        resolve(file);
+        return;
+      }
+      var img = new Image();
+      var objUrl = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(objUrl);
+        var maxW = 1600;
+        var w = img.naturalWidth || img.width;
+        var h = img.naturalHeight || img.height;
+        if (w > maxW) {
+          h = Math.round(h * (maxW / w));
+          w = maxW;
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function (blob) {
+          if (!blob) { resolve(file); return; }
+          if (blob.size > 1900000) {
+            canvas.toBlob(function (b2) { resolve(b2 || blob); }, 'image/jpeg', 0.72);
+          } else {
+            resolve(blob);
+          }
+        }, 'image/jpeg', 0.86);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(objUrl);
+        resolve(file);
+      };
+      img.src = objUrl;
+    });
+  }
+
+  function uploadRawBlob(blob) {
+    return fetch('/api/studio/upload', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+      body: blob
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (r.status === 401) { showGate(); throw new Error('登录已过期'); }
+        if (!r.ok || !d.url) throw new Error(d.error || '图片上传失败');
+        return d.url;
+      });
+    });
+  }
+
+  function uploadImageFile(file) {
+    return prepareImageBlob(file).then(uploadRawBlob);
+  }
+
+  /* =========================================================
+     Interactive 16:9 Cover Cropper (Touch Drag + Pinch + Mouse)
+     ========================================================= */
+  var crop = {
+    open: false,
+    objUrl: '',
+    rawFile: null,
+    aspect: 16 / 9,
+    maxW: 1280,
+    onDone: null,
+    natW: 0,
+    natH: 0,
+    stageW: 1,
+    stageH: 1,
+    minScale: 1,
+    zoom: 1,
+    ox: 0,
+    oy: 0,
+    ptrs: new Map(),
+    pinchDist: 0
+  };
+
+  function clampCrop() {
+    var scale = crop.minScale * crop.zoom;
+    var dispW = crop.natW * scale;
+    var dispH = crop.natH * scale;
+    var minX = Math.min(0, crop.stageW - dispW);
+    var minY = Math.min(0, crop.stageH - dispH);
+    if (crop.ox > 0) crop.ox = 0;
+    if (crop.ox < minX) crop.ox = minX;
+    if (crop.oy > 0) crop.oy = 0;
+    if (crop.oy < minY) crop.oy = minY;
+  }
+
+  function applyCropTransform() {
+    clampCrop();
+    var scale = crop.minScale * crop.zoom;
+    cropImg.style.width = crop.natW + 'px';
+    cropImg.style.height = crop.natH + 'px';
+    cropImg.style.transform =
+      'translate3d(' + crop.ox.toFixed(2) + 'px,' + crop.oy.toFixed(2) + 'px,0) scale(' + scale.toFixed(6) + ')';
+    cropZoom.value = crop.zoom.toFixed(2);
+    cropZoomVal.textContent = Math.round(crop.zoom * 100) + '%';
+  }
+
+  function setCropZoomAround(nextZoom, pivotX, pivotY) {
+    nextZoom = Math.max(1, Math.min(3, nextZoom));
+    var oldScale = crop.minScale * crop.zoom;
+    var newScale = crop.minScale * nextZoom;
+    if (oldScale > 0) {
+      var imgX = (pivotX - crop.ox) / oldScale;
+      var imgY = (pivotY - crop.oy) / oldScale;
+      crop.ox = pivotX - imgX * newScale;
+      crop.oy = pivotY - imgY * newScale;
+    }
+    crop.zoom = nextZoom;
+    applyCropTransform();
+  }
+
+  function resetCropPosition(mode) {
+    crop.stageW = cropStage.clientWidth || 1;
+    crop.stageH = cropStage.clientHeight || 1;
+    if (!crop.natW || !crop.natH) return;
+    crop.minScale = Math.max(crop.stageW / crop.natW, crop.stageH / crop.natH);
+    if (mode === 'reset' || mode === 'init') crop.zoom = 1;
+    var scale = crop.minScale * crop.zoom;
+    var dispW = crop.natW * scale;
+    var dispH = crop.natH * scale;
+    crop.ox = (crop.stageW - dispW) / 2;
+    if (mode === 'top') {
+      crop.oy = 0;
+    } else if (mode === 'center') {
+      crop.oy = (crop.stageH - dispH) / 2;
+    } else {
+      // Default top-biased framing (16% down) so vertical character heads stay framed
+      crop.oy = (crop.stageH - dispH) * 0.16;
+    }
+    applyCropTransform();
+  }
+
+  function closeCropper() {
+    crop.open = false;
+    crop.ptrs.clear();
+    crop.pinchDist = 0;
+    cropModal.classList.add('hidden');
+    document.body.style.overflow = '';
+    if (crop.objUrl) {
+      URL.revokeObjectURL(crop.objUrl);
+      crop.objUrl = '';
+    }
+    crop.rawFile = null;
+    cropImg.removeAttribute('src');
+  }
+
+  function openCropper(source, rawFile, opts) {
+    opts = opts || {};
+    if (crop.objUrl) {
+      URL.revokeObjectURL(crop.objUrl);
+      crop.objUrl = '';
+    }
+    crop.rawFile = rawFile || null;
+    crop.aspect = opts.aspect || (16 / 9);
+    crop.maxW = opts.maxW || 1280;
+    crop.onDone = opts.onDone || function (url) {
+      fCover.value = url;
+      syncCoverUI();
+      coverStatus.textContent = '封面已裁剪上传 ✦';
+      showToast('封面图裁剪并上传成功 ✦');
+    };
+    crop.ptrs.clear();
+    crop.pinchDist = 0;
+    var isSquare = Math.abs(crop.aspect - 1) < 0.05;
+    cropStage.classList.toggle('is-square', isSquare);
+    cropTitle.textContent = opts.title || (isSquare ? '✂️ 自由裁剪头像（1:1 圆形框）' : '✂️ 自由裁剪文章封面（16:9 封面框）');
+    cropGifRawBtn.classList.toggle('hidden', !(rawFile && rawFile.type === 'image/gif'));
+    cropConfirmBtn.disabled = false;
+    cropConfirmBtn.textContent = '✂️ 确认裁剪并上传';
+
+    var imgUrl = '';
+    if (typeof source === 'string') {
+      imgUrl = source;
+      if (source.indexOf('/') === 0) cropImg.removeAttribute('crossorigin');
+      else cropImg.crossOrigin = 'anonymous';
+    } else {
+      crop.objUrl = URL.createObjectURL(source);
+      imgUrl = crop.objUrl;
+      cropImg.removeAttribute('crossorigin');
+    }
+
+    crop.open = true;
+    cropModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    cropImg.onload = function () {
+      crop.natW = cropImg.naturalWidth || cropImg.width;
+      crop.natH = cropImg.naturalHeight || cropImg.height;
+      requestAnimationFrame(function () {
+        resetCropPosition('init');
+      });
+    };
+    cropImg.onerror = function () {
+      closeCropper();
+      showToast('无法加载该图片，请重新选择本地图片', true);
+    };
+    cropImg.src = imgUrl;
+  }
+
+  cropStage.addEventListener('pointerdown', function (e) {
+    if (!crop.open) return;
+    e.preventDefault();
+    try { cropStage.setPointerCapture(e.pointerId); } catch (_) {}
+    crop.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    cropStage.classList.add('is-dragging');
+    if (crop.ptrs.size === 2) {
+      var pts = Array.from(crop.ptrs.values());
+      crop.pinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    }
+  });
+
+  cropStage.addEventListener('pointermove', function (e) {
+    if (!crop.open || !crop.ptrs.has(e.pointerId)) return;
+    e.preventDefault();
+    var prev = crop.ptrs.get(e.pointerId);
+    var cur = { x: e.clientX, y: e.clientY };
+    crop.ptrs.set(e.pointerId, cur);
+
+    if (crop.ptrs.size === 1) {
+      crop.ox += cur.x - prev.x;
+      crop.oy += cur.y - prev.y;
+      applyCropTransform();
+    } else if (crop.ptrs.size === 2) {
+      var pts = Array.from(crop.ptrs.values());
+      var dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      if (crop.pinchDist > 8 && dist > 8) {
+        var rect = cropStage.getBoundingClientRect();
+        var midX = (pts[0].x + pts[1].x) / 2 - rect.left;
+        var midY = (pts[0].y + pts[1].y) / 2 - rect.top;
+        setCropZoomAround(crop.zoom * (dist / crop.pinchDist), midX, midY);
+      }
+      crop.pinchDist = dist;
+    }
+  });
+
+  function endCropPtr(e) {
+    crop.ptrs.delete(e.pointerId);
+    if (crop.ptrs.size < 2) crop.pinchDist = 0;
+    if (crop.ptrs.size === 0) cropStage.classList.remove('is-dragging');
+  }
+  cropStage.addEventListener('pointerup', endCropPtr);
+  cropStage.addEventListener('pointercancel', endCropPtr);
+
+  cropStage.addEventListener('wheel', function (e) {
+    if (!crop.open) return;
+    e.preventDefault();
+    var rect = cropStage.getBoundingClientRect();
+    var px = e.clientX - rect.left;
+    var py = e.clientY - rect.top;
+    var factor = e.deltaY < 0 ? 1.09 : 0.92;
+    setCropZoomAround(crop.zoom * factor, px, py);
+  }, { passive: false });
+
+  cropZoom.addEventListener('input', function () {
+    setCropZoomAround(parseFloat(cropZoom.value) || 1, crop.stageW / 2, crop.stageH / 2);
+  });
+
+  window.addEventListener('resize', function () {
+    if (!crop.open || !crop.natW) return;
+    var oldScale = crop.minScale * crop.zoom;
+    var centerImgX = (crop.stageW / 2 - crop.ox) / oldScale;
+    var centerImgY = (crop.stageH / 2 - crop.oy) / oldScale;
+    crop.stageW = cropStage.clientWidth || 1;
+    crop.stageH = cropStage.clientHeight || 1;
+    crop.minScale = Math.max(crop.stageW / crop.natW, crop.stageH / crop.natH);
+    var newScale = crop.minScale * crop.zoom;
+    crop.ox = crop.stageW / 2 - centerImgX * newScale;
+    crop.oy = crop.stageH / 2 - centerImgY * newScale;
+    applyCropTransform();
+  });
+
+  document.getElementById('crop-align-top').addEventListener('click', function () { resetCropPosition('top'); });
+  document.getElementById('crop-align-center').addEventListener('click', function () { resetCropPosition('center'); });
+  document.getElementById('crop-reset').addEventListener('click', function () { resetCropPosition('reset'); });
+  document.getElementById('crop-close-btn').addEventListener('click', closeCropper);
+  document.getElementById('crop-cancel-btn').addEventListener('click', closeCropper);
+
+  cropGifRawBtn.addEventListener('click', function () {
+    if (!crop.rawFile) return;
+    var file = crop.rawFile;
+    var doneCb = crop.onDone;
+    cropConfirmBtn.disabled = true;
+    coverStatus.textContent = '上传 GIF 动图中...';
+    uploadImageFile(file)
+      .then(function (url) {
+        closeCropper();
+        if (doneCb) doneCb(url);
+      })
+      .catch(function (err) {
+        cropConfirmBtn.disabled = false;
+        coverStatus.textContent = '';
+        showToast(esc(err.message), true);
+      });
+  });
+
+  cropConfirmBtn.addEventListener('click', function () {
+    if (!crop.natW || !crop.natH) return;
+    var doneCb = crop.onDone;
+    cropConfirmBtn.disabled = true;
+    cropConfirmBtn.textContent = '裁剪上传中...';
+
+    var scale = crop.minScale * crop.zoom;
+    var sx = Math.max(0, Math.min(crop.natW - 1, -crop.ox / scale));
+    var sy = Math.max(0, Math.min(crop.natH - 1, -crop.oy / scale));
+    var sw = Math.min(crop.natW - sx, crop.stageW / scale);
+    var sh = Math.min(crop.natH - sy, crop.stageH / scale);
+
+    var outW = Math.min(crop.maxW, Math.max(512, Math.round(sw)));
+    var outH = Math.round(outW / crop.aspect);
+    var canvas = document.createElement('canvas');
+    canvas.width = outW;
+    canvas.height = outH;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, outW, outH);
+    try {
+      ctx.drawImage(cropImg, sx, sy, sw, sh, 0, 0, outW, outH);
+      canvas.toBlob(function (blob) {
+        if (!blob) {
+          cropConfirmBtn.disabled = false;
+          cropConfirmBtn.textContent = '✂️ 确认裁剪并上传';
+          showToast('图片裁剪失败，请重试', true);
+          return;
+        }
+        var doUpload = function (finalBlob) {
+          uploadRawBlob(finalBlob)
+            .then(function (url) {
+              closeCropper();
+              if (doneCb) doneCb(url);
+            })
+            .catch(function (err) {
+              cropConfirmBtn.disabled = false;
+              cropConfirmBtn.textContent = '✂️ 确认裁剪并上传';
+              showToast(esc(err.message), true);
+            });
+        };
+        if (blob.size > 1850000) {
+          canvas.toBlob(function (b2) { doUpload(b2 || blob); }, 'image/jpeg', 0.74);
+        } else {
+          doUpload(blob);
+        }
+      }, 'image/jpeg', 0.88);
+    } catch (e) {
+      cropConfirmBtn.disabled = false;
+      cropConfirmBtn.textContent = '✂️ 确认裁剪并上传';
+      showToast('外链图片因跨域限制无法裁剪，请从本地重新选择上传', true);
+    }
+  });
+
+  /* Cover Upload Events */
+  document.getElementById('cover-upload-btn').addEventListener('click', function () { coverFile.click(); });
+  coverRecropBtn.addEventListener('click', function () {
+    var u = fCover.value.trim();
+    if (!u) return;
+    openCropper(u, null);
+  });
+  function handleCoverPick(file) {
+    if (!file) return;
+    if (!file.type || file.type.indexOf('image/') !== 0) {
+      showToast('请选择图片文件（JPG / PNG / GIF / WebP）', true);
+      return;
+    }
+    openCropper(file, file);
+  }
+  coverFile.addEventListener('change', function () {
+    if (coverFile.files && coverFile.files[0]) handleCoverPick(coverFile.files[0]);
+    coverFile.value = '';
+  });
+  coverDrop.addEventListener('dragover', function (e) { e.preventDefault(); coverDrop.classList.add('is-drag'); });
+  coverDrop.addEventListener('dragleave', function () { coverDrop.classList.remove('is-drag'); });
+  coverDrop.addEventListener('drop', function (e) {
+    e.preventDefault();
+    coverDrop.classList.remove('is-drag');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleCoverPick(e.dataTransfer.files[0]);
+    }
+  });
+
+  /* Inline Textarea Helpers & Image Upload */
+  function insertAtCursor(before, after) {
+    var start = fContent.selectionStart || 0;
+    var end = fContent.selectionEnd || 0;
+    var sel = fContent.value.slice(start, end);
+    var text = before + sel + (after || '');
+    fContent.setRangeText(text, start, end, 'end');
+    fContent.focus();
+    if (state.previewOn) renderPreview();
+  }
+
+  function uploadInlineFiles(fileList) {
+    var arr = Array.prototype.slice.call(fileList || []).filter(function (f) {
+      return f && f.type && f.type.indexOf('image/') === 0;
+    });
+    if (!arr.length) return;
+    imgStatus.textContent = '正在上传 ' + arr.length + ' 张图片...';
+    var chain = Promise.resolve();
+    var okCount = 0;
+    arr.forEach(function (file) {
+      chain = chain.then(function () {
+        return uploadImageFile(file).then(function (url) {
+          var alt = (file.name || '图片').replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '') || '图片';
+          insertAtCursor('\n![' + alt + '](' + url + ')\n', '');
+          okCount++;
+        });
+      });
+    });
+    chain
+      .then(function () {
+        imgStatus.textContent = '已插入 ' + okCount + ' 张图片 ✦';
+        showToast('已上传并插入 ' + okCount + ' 张图片 ✦');
+      })
+      .catch(function (err) {
+        imgStatus.textContent = '';
+        showToast(esc(err.message), true);
+      });
+  }
+
+  document.getElementById('tb-img').addEventListener('click', function () { inlineFiles.click(); });
+  inlineFiles.addEventListener('change', function () {
+    uploadInlineFiles(inlineFiles.files);
+    inlineFiles.value = '';
+  });
+
+  fContent.addEventListener('dragover', function (e) { e.preventDefault(); fContent.classList.add('is-drag'); });
+  fContent.addEventListener('dragleave', function () { fContent.classList.remove('is-drag'); });
+  fContent.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      e.preventDefault();
+      fContent.classList.remove('is-drag');
+      uploadInlineFiles(e.dataTransfer.files);
+    }
+  });
+  fContent.addEventListener('paste', function (e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    var imgs = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type && items[i].type.indexOf('image/') === 0) {
+        var f = items[i].getAsFile();
+        if (f) imgs.push(f);
+      }
+    }
+    if (imgs.length) {
+      e.preventDefault();
+      uploadInlineFiles(imgs);
+    }
+  });
+
+  document.querySelectorAll('.tb-btn[data-md]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var kind = btn.getAttribute('data-md');
+      if (kind === 'h2') insertAtCursor('\n## ', '\n');
+      else if (kind === 'bold') insertAtCursor('**', '**');
+      else if (kind === 'italic') insertAtCursor('*', '*');
+      else if (kind === 'quote') insertAtCursor('\n> ', '\n');
+      else if (kind === 'code') insertAtCursor('\n```\n', '\n```\n');
+      else if (kind === 'link') insertAtCursor('[链接文字](', ')');
+    });
+  });
+
+  /* Safe Lightweight Markdown Preview */
+  function safeUrl(u) {
+    u = (u || '').trim();
+    if (/^(https?:\/\/|\/|#)/i.test(u)) return u;
+    return '#';
+  }
+  function mdInline(s) {
+    var out = esc(s);
+    out = out.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, url) {
+      return '<img src="' + esc(safeUrl(url)) + '" alt="' + alt + '">';
+    });
+    out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, txt, url) {
+      return '<a href="' + esc(safeUrl(url)) + '" target="_blank">' + txt + '</a>';
+    });
+    out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
+    out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    return out;
+  }
+  function renderPreview() {
+    var lines = (fContent.value || '').replace(/\r\n/g, '\n').split('\n');
+    var html = [];
+    var inCode = false;
+    var codeBuf = [];
+    var inUl = false;
+    function closeUl() { if (inUl) { html.push('</ul>'); inUl = false; } }
+
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      if (/^```/.test(ln)) {
+        closeUl();
+        if (!inCode) { inCode = true; codeBuf = []; }
+        else { html.push('<pre><code>' + esc(codeBuf.join('\n')) + '</code></pre>'); inCode = false; }
+        continue;
+      }
+      if (inCode) { codeBuf.push(ln); continue; }
+      if (!ln.trim()) { closeUl(); continue; }
+      var hm = ln.match(/^(#{1,4})\s+(.*)$/);
+      if (hm) { closeUl(); var lvl = hm[1].length; html.push('<h' + lvl + '>' + mdInline(hm[2]) + '</h' + lvl + '>'); continue; }
+      if (/^>\s?/.test(ln)) { closeUl(); html.push('<blockquote>' + mdInline(ln.replace(/^>\s?/, '')) + '</blockquote>'); continue; }
+      if (/^[-*]\s+/.test(ln)) {
+        if (!inUl) { html.push('<ul>'); inUl = true; }
+        html.push('<li>' + mdInline(ln.replace(/^[-*]\s+/, '')) + '</li>');
+        continue;
+      }
+      closeUl();
+      html.push('<p>' + mdInline(ln) + '</p>');
+    }
+    closeUl();
+    if (inCode) html.push('<pre><code>' + esc(codeBuf.join('\n')) + '</code></pre>');
+    mdPreview.innerHTML = html.join('') || '<p style="color:var(--muted)">预览区为空，开始输入正文吧～</p>';
+  }
+
+  tbPreview.addEventListener('click', function () {
+    state.previewOn = !state.previewOn;
+    mdSplit.classList.toggle('show-preview', state.previewOn);
+    mdPreview.classList.toggle('hidden', !state.previewOn);
+    tbPreview.textContent = state.previewOn ? '👁️ 关闭预览' : '👁️ 开启预览';
+    if (state.previewOn) renderPreview();
+  });
+  fContent.addEventListener('input', function () {
+    if (state.previewOn) renderPreview();
+  });
+
+  /* Reset Editor for New Post */
+  function resetEditor() {
+    state.editingSlug = '';
+    fTitle.value = '';
+    fSlug.value = '';
+    fSlug.readOnly = false;
+    fDate.value = todayStr();
+    fCat.value = '';
+    fTags.value = '';
+    fSummary.value = '';
+    fCover.value = '';
+    fContent.value = '';
+    fDraft.checked = false;
+    coverStatus.textContent = '';
+    imgStatus.textContent = '';
+    editorModeLabel.textContent = '✍️ 发布新文章';
+    editorSlugBadge.classList.add('hidden');
+    saveBtn.textContent = '✦ 发布文章';
+    syncCoverUI();
+    if (state.previewOn) renderPreview();
+  }
+  document.getElementById('new-post-btn').addEventListener('click', function () {
+    resetEditor();
+    showToast('已切换为新建空白文章 ✦');
+  });
+
+  function generateSlug() {
+    var d = todayStr().replace(/-/g, '');
+    var rand = Math.random().toString(36).slice(2, 6);
+    return 'post-' + d + '-' + rand;
+  }
+
+  /* Save / Publish Post */
+  saveBtn.addEventListener('click', function () {
+    var title = fTitle.value.trim();
+    if (!title) { showToast('请先填写文章标题～', true); fTitle.focus(); return; }
+    var slug = fSlug.value.trim();
+    if (!slug) {
+      slug = generateSlug();
+      fSlug.value = slug;
+    }
+    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(slug)) {
+      showToast('文章链接 (Slug) 仅支持英文字母、数字、- 和 _', true);
+      fSlug.focus();
+      return;
+    }
+    saveBtn.disabled = true;
+    var payload = {
+      title: title,
+      slug: slug,
+      date: fDate.value.trim() || todayStr(),
+      category: fCat.value.trim(),
+      tags: fTags.value.trim(),
+      summary: fSummary.value.trim(),
+      cover: fCover.value.trim(),
+      draft: fDraft.checked ? 'true' : 'false',
+      content: fContent.value
+    };
+    api('POST', '/api/studio/posts', payload)
+      .then(function (res) {
+        state.editingSlug = res.slug;
+        fSlug.readOnly = true;
+        editorModeLabel.textContent = '✏️ 编辑文章';
+        editorSlugBadge.textContent = res.slug;
+        editorSlugBadge.classList.remove('hidden');
+        saveBtn.textContent = '✦ 保存修改';
+        var viewLink = fDraft.checked
+          ? '草稿已保存 ✦'
+          : '发布成功 ✦ <a href="/post/' + esc(res.slug) + '/" target="_blank">立即查看 ↗</a>';
+        showToast(viewLink);
+        return refreshAll();
+      })
+      .catch(function (err) {
+        showToast(esc(err.message), true);
+      })
+      .finally(function () {
+        saveBtn.disabled = false;
+      });
+  });
+
+  /* Load Categories into Select & Category Manager */
+  function renderCats() {
+    cntCats.textContent = String(state.cats.length);
+    var prevVal = fCat.value;
+    var opts = '<option value="">（未分类）</option>';
+    state.cats.forEach(function (c) {
+      opts += '<option value="' + esc(c.name) + '">' + esc(c.name) + ' (' + c.count + ')</option>';
+    });
+    if (prevVal && !state.cats.some(function (c) { return c.name === prevVal; })) {
+      opts += '<option value="' + esc(prevVal) + '">' + esc(prevVal) + '</option>';
+    }
+    fCat.innerHTML = opts;
+    fCat.value = prevVal;
+
+    if (!state.cats.length) {
+      catsGrid.innerHTML = '<p style="color:var(--muted)">还没有任何分类，在上方添加一个吧～</p>';
+      return;
+    }
+    catsGrid.innerHTML = state.cats.map(function (c) {
+      return (
+        '<div class="cat-card">' +
+          '<div>' +
+            '<div class="cat-card-name">✦ ' + esc(c.name) + '</div>' +
+            '<span class="field-hint">' + c.count + ' 篇文章</span>' +
+          '</div>' +
+          '<button class="btn btn-danger btn-sm" type="button" data-del-cat="' + esc(c.name) + '" data-cat-cnt="' + c.count + '">删除</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  /* Load Posts into Management List */
+  function renderPosts() {
+    cntPosts.textContent = String(state.posts.length);
+    if (!state.posts.length) {
+      postsList.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0">还没有发布过文章，去「写文章」创作第一篇吧～</p>';
+      return;
+    }
+    postsList.innerHTML = state.posts.map(function (p) {
+      var thumb = p.cover
+        ? '<img class="post-row-thumb" src="' + esc(p.cover) + '" alt="">'
+        : '';
+      var catBadge = p.category ? '<span class="badge badge-lilac">✦ ' + esc(p.category) + '</span>' : '';
+      var draftBadge = p.draft ? '<span class="badge badge-draft">草稿</span>' : '<span class="badge">已发布</span>';
+      return (
+        '<div class="post-row">' +
+          thumb +
+          '<div class="post-row-info">' +
+            '<div class="post-row-title">' + esc(p.title) + '</div>' +
+            '<div class="post-row-meta">' +
+              draftBadge + catBadge +
+              '<span>' + esc(p.date) + '</span>' +
+              '<span>/' + esc(p.slug) + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="post-row-ops">' +
+            '<button class="btn btn-soft btn-sm" type="button" data-edit-post="' + esc(p.slug) + '">编辑</button>' +
+            (p.draft ? '' : '<a class="btn btn-sm" href="/post/' + esc(p.slug) + '/" target="_blank">查看</a>') +
+            '<button class="btn btn-danger btn-sm" type="button" data-del-post="' + esc(p.slug) + '" data-post-title="' + esc(p.title) + '">删除</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  postsList.addEventListener('click', function (e) {
+    var editBtn = e.target.closest('[data-edit-post]');
+    if (editBtn) {
+      var slug = editBtn.getAttribute('data-edit-post');
+      api('GET', '/api/studio/posts/' + encodeURIComponent(slug))
+        .then(function (p) {
+          state.editingSlug = p.slug;
+          fTitle.value = p.title || '';
+          fSlug.value = p.slug || '';
+          fSlug.readOnly = true;
+          fDate.value = p.date || todayStr();
+          fTags.value = p.tags || '';
+          fSummary.value = p.summary || '';
+          fCover.value = p.cover || '';
+          fContent.value = p.content || '';
+          fDraft.checked = !!p.draft;
+          renderCats();
+          fCat.value = p.category || '';
+          syncCoverUI();
+          editorModeLabel.textContent = '✏️ 编辑文章';
+          editorSlugBadge.textContent = p.slug;
+          editorSlugBadge.classList.remove('hidden');
+          saveBtn.textContent = '✦ 保存修改';
+          if (state.previewOn) renderPreview();
+          switchTab('write');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        })
+        .catch(function (err) { showToast(esc(err.message), true); });
+      return;
+    }
+
+    var delBtn = e.target.closest('[data-del-post]');
+    if (delBtn) {
+      var slug = delBtn.getAttribute('data-del-post');
+      var title = delBtn.getAttribute('data-post-title') || slug;
+      if (!confirm('确定要永久删除文章「' + title + '」吗？此操作无法撤销。')) return;
+      api('DELETE', '/api/studio/posts/' + encodeURIComponent(slug))
+        .then(function () {
+          if (state.editingSlug === slug) resetEditor();
+          showToast('文章已删除 ✦');
+          return refreshAll();
+        })
+        .catch(function (err) { showToast(esc(err.message), true); });
+    }
+  });
+
+  document.getElementById('cat-add-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var inp = document.getElementById('new-cat-name');
+    var name = inp.value.trim();
+    if (!name) return;
+    api('POST', '/api/studio/categories', { name: name })
+      .then(function (res) {
+        inp.value = '';
+        showToast(res.exists ? '该分类已存在啦～' : '已添加分类「' + esc(name) + '」✦');
+        return refreshAll();
+      })
+      .catch(function (err) { showToast(esc(err.message), true); });
+  });
+
+  catsGrid.addEventListener('click', function (e) {
+    var delBtn = e.target.closest('[data-del-cat]');
+    if (!delBtn) return;
+    var name = delBtn.getAttribute('data-del-cat');
+    var cnt = parseInt(delBtn.getAttribute('data-cat-cnt') || '0', 10);
+    var msg = cnt > 0
+      ? '确定删除分类「' + name + '」吗？（该分类下有 ' + cnt + ' 篇文章，删除后这些文章将变为未分类，文章本身不会删除）'
+      : '确定删除分类「' + name + '」吗？';
+    if (!confirm(msg)) return;
+    api('POST', '/api/studio/categories/delete', { name: name })
+      .then(function () {
+        if (fCat.value === name) fCat.value = '';
+        showToast('已删除分类「' + esc(name) + '」✦');
+        return refreshAll();
+      })
+      .catch(function (err) { showToast(esc(err.message), true); });
+  });
+
+  document.getElementById('refresh-posts-btn').addEventListener('click', function () {
+    refreshAll().then(function () { showToast('列表已刷新 ✦'); });
+  });
+
+  /* Site Appearance & Security Settings */
+  var sSiteName = document.getElementById('s-site-name');
+  var sAuthor = document.getElementById('s-author');
+  var sSubtitle = document.getElementById('s-subtitle');
+  var sFooter = document.getElementById('s-footer');
+  var sSiteUrl = document.getElementById('s-site-url');
+  var sPerPage = document.getElementById('s-per-page');
+  var sAvatarUrl = document.getElementById('s-avatar-url');
+  var sAvatarPrev = document.getElementById('s-avatar-preview');
+  var sAvatarFile = document.getElementById('s-avatar-file');
+  var sBannerUrl = document.getElementById('s-banner-url');
+  var sBannerPrev = document.getElementById('s-banner-preview');
+  var sBannerFile = document.getElementById('s-banner-file');
+  var sStudioPath = document.getElementById('s-studio-path');
+  var sNewPass = document.getElementById('s-new-pass');
+  var saveSettingsBtn = document.getElementById('save-settings-btn');
+  var topBrandName = document.getElementById('top-brand-name');
+  var topAvatar = document.getElementById('top-avatar');
+  var gateAvatar = document.getElementById('gate-avatar');
+
+  function applySettingsUI(cfg) {
+    if (!cfg) return;
+    sSiteName.value = cfg.site_name || '';
+    sAuthor.value = cfg.author || '';
+    sSubtitle.value = cfg.subtitle || '';
+    sFooter.value = cfg.footer_text || '';
+    sSiteUrl.value = cfg.site_url || '';
+    sPerPage.value = String(cfg.per_page || 6);
+    sAvatarUrl.value = cfg.avatar_url || '/static/avatar.jpg?v=2';
+    sBannerUrl.value = cfg.banner_url || '/static/hero-banner.jpg?v=2';
+    sStudioPath.value = cfg.studio_path || '/studio';
+    sAvatarPrev.src = sAvatarUrl.value;
+    sBannerPrev.src = sBannerUrl.value;
+    if (cfg.site_name) {
+      topBrandName.textContent = '✦ ' + cfg.site_name + ' · 写作室';
+      document.title = '✦ ' + cfg.site_name + ' · Author Studio';
+    }
+    if (cfg.avatar_url) {
+      topAvatar.src = cfg.avatar_url;
+      gateAvatar.src = cfg.avatar_url;
+    }
+  }
+
+  sAvatarUrl.addEventListener('input', function () {
+    if (sAvatarUrl.value.trim()) sAvatarPrev.src = sAvatarUrl.value.trim();
+  });
+  sBannerUrl.addEventListener('input', function () {
+    if (sBannerUrl.value.trim()) sBannerPrev.src = sBannerUrl.value.trim();
+  });
+
+  function openAvatarCropper(src, file) {
+    openCropper(src, file, {
+      aspect: 1,
+      maxW: 640,
+      title: '✂️ 自由裁剪博主头像（1:1 圆形框）',
+      onDone: function (url) {
+        sAvatarUrl.value = url;
+        sAvatarPrev.src = url;
+        showToast('头像已裁剪上传，点击「保存站点设置」生效 ✦');
+      }
+    });
+  }
+  function openBannerCropper(src, file) {
+    openCropper(src, file, {
+      aspect: 16 / 9,
+      maxW: 1376,
+      title: '✂️ 自由裁剪首页头图（16:9 宽屏框）',
+      onDone: function (url) {
+        sBannerUrl.value = url;
+        sBannerPrev.src = url;
+        showToast('头图已裁剪上传，点击「保存站点设置」生效 ✦');
+      }
+    });
+  }
+
+  document.getElementById('s-avatar-btn').addEventListener('click', function () { sAvatarFile.click(); });
+  document.getElementById('s-avatar-recrop').addEventListener('click', function () {
+    if (sAvatarUrl.value.trim()) openAvatarCropper(sAvatarUrl.value.trim(), null);
+  });
+  sAvatarFile.addEventListener('change', function () {
+    if (sAvatarFile.files && sAvatarFile.files[0]) openAvatarCropper(sAvatarFile.files[0], sAvatarFile.files[0]);
+    sAvatarFile.value = '';
+  });
+
+  document.getElementById('s-banner-btn').addEventListener('click', function () { sBannerFile.click(); });
+  document.getElementById('s-banner-recrop').addEventListener('click', function () {
+    if (sBannerUrl.value.trim()) openBannerCropper(sBannerUrl.value.trim(), null);
+  });
+  sBannerFile.addEventListener('change', function () {
+    if (sBannerFile.files && sBannerFile.files[0]) openBannerCropper(sBannerFile.files[0], sBannerFile.files[0]);
+    sBannerFile.value = '';
+  });
+
+  saveSettingsBtn.addEventListener('click', function () {
+    var payload = {
+      site_name: sSiteName.value.trim(),
+      author: sAuthor.value.trim(),
+      subtitle: sSubtitle.value.trim(),
+      footer_text: sFooter.value.trim(),
+      site_url: sSiteUrl.value.trim(),
+      per_page: String(sPerPage.value || '6').trim(),
+      avatar_url: sAvatarUrl.value.trim(),
+      banner_url: sBannerUrl.value.trim(),
+      studio_path: sStudioPath.value.trim()
+    };
+    var np = sNewPass.value;
+    if (np) payload.new_password = np;
+    saveSettingsBtn.disabled = true;
+    api('POST', '/api/studio/settings', payload)
+      .then(function (res) {
+        sNewPass.value = '';
+        var newPath = res.studio_path || payload.studio_path;
+        if (newPath && window.location.pathname !== newPath) {
+          history.replaceState({}, '', newPath);
+          showToast('设置已生效 ✦ 新后台地址：' + esc(newPath));
+        } else {
+          showToast('站点设置已保存并实时生效 ✦');
+        }
+        return refreshAll();
+      })
+      .catch(function (err) { showToast(esc(err.message), true); })
+      .finally(function () { saveSettingsBtn.disabled = false; });
+  });
+
+  function refreshAll() {
+    return Promise.all([
+      api('GET', '/api/studio/posts'),
+      api('GET', '/api/studio/categories'),
+      api('GET', '/api/studio/settings')
+    ]).then(function (res) {
+      state.posts = Array.isArray(res[0]) ? res[0] : [];
+      state.cats = Array.isArray(res[1]) ? res[1] : [];
+      renderPosts();
+      renderCats();
+      applySettingsUI(res[2]);
+    });
+  }
+
+  /* Auth Login & Logout */
+  loginForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    loginErr.textContent = '';
+    var pw = loginPass.value;
+    if (!pw) return;
+    fetch('/api/studio/login', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.error || '口令错误');
+        loginPass.value = '';
+        showApp();
+        resetEditor();
+        return refreshAll();
+      });
+    }).catch(function (err) {
+      loginErr.textContent = err.message || '口令错误';
+      loginPass.select();
+    });
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', function () {
+    fetch('/api/studio/logout', { method: 'POST', credentials: 'same-origin' })
+      .finally(function () { showGate(); });
+  });
+
+  /* Auto-check existing 30-day session on open */
+  fDate.value = todayStr();
+  refreshAll()
+    .then(function () {
+      showApp();
+      resetEditor();
+    })
+    .catch(function () {
+      showGate();
+    });
+})();
+</script>
+</body>
+</html>

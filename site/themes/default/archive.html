@@ -1,0 +1,16 @@
+<section class="page-head">
+  <h1>文章归档</h1>
+  <p class="muted">共收录 {{ post_count }} 篇已发布文章</p>
+</section>
+
+<ul class="archive-list">
+  {{#posts}}
+  <li class="archive-item">
+    <time class="archive-date">{{ date }}</time>
+    <a class="archive-link" href="/post/{{ slug }}/">{{ title }}</a>
+  </li>
+  {{/posts}}
+  {{^posts}}
+  <li class="empty-state">暂无归档文章。</li>
+  {{/posts}}
+</ul>

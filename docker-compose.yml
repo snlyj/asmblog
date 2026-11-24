@@ -1,0 +1,34 @@
+services:
+  asmblog:
+    build: .
+    container_name: asmblog
+    restart: unless-stopped
+    volumes:
+      - ./site:/site
+    ports:
+      # Exposed locally; change to "8080:8080" if you don't use Caddy below
+      - "127.0.0.1:8080:8080"
+    mem_limit: 64m
+
+  # Optional automatic HTTPS reverse proxy (HTTP/2 + HTTP/3 + Let's Encrypt)
+  # Copy Caddyfile.example -> Caddyfile and replace your domain before running:
+  #   docker compose --profile https up -d
+  caddy:
+    image: caddy:2-alpine
+    container_name: asmblog-caddy
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      - asmblog
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

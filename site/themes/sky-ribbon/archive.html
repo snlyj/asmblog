@@ -1,0 +1,24 @@
+<div class="feed-wrap">
+  <section class="page-head-card reveal">
+    <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+    <span class="candy-badge candy-sky">✦ STARLIGHT ARCHIVE</span>
+    <h1>星光归档</h1>
+    <p class="muted">沿着晴空时间轴，一共珍藏了 {{ post_count }} 篇笔记</p>
+  </section>
+
+  <ul class="archive-timeline">
+    {{#posts}}
+    <li class="archive-item reveal">
+      <span class="timeline-star" aria-hidden="true">✦</span>
+      <a class="archive-card" href="/post/{{ slug }}/">
+        <time class="archive-date">{{ date }}</time>
+        <span class="archive-title">{{ title }}</span>
+        <span class="archive-arrow" aria-hidden="true">&rarr;</span>
+      </a>
+    </li>
+    {{/posts}}
+    {{^posts}}
+    <li class="empty-state reveal">暂时还没有归档文章哦～</li>
+    {{/posts}}
+  </ul>
+</div>

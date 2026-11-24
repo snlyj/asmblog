@@ -1,0 +1,21 @@
+# Build artifacts
+/asmblog
+/build/
+*.o
+
+# Generated static exports
+site/dist/
+site/dist_*/
+
+# User-uploaded images (keep folder tracked via .gitkeep)
+site/content/uploads/*
+!site/content/uploads/.gitkeep
+
+# Secrets, keys, temporary files
+*.pem
+*.key
+*.tar.gz
+*.tmp
+.DS_Store
+__pycache__/
+*.pyc

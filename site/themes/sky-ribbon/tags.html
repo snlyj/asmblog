@@ -1,0 +1,22 @@
+<div class="feed-wrap">
+  <section class="page-head-card reveal">
+    <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+    <span class="candy-badge candy-pink">✦ MACARON TAGS</span>
+    <h1>糖果标签云</h1>
+    <p class="muted">共收集了 {{ tag_count }} 个闪闪发光的主题标签</p>
+  </section>
+
+  <div class="tag-cloud-card reveal">
+    <div class="tag-cloud">
+      {{#tags}}
+      <a class="tag-pill" href="/tag/{{ name }}/">
+        <span class="tag-pill-text">#{{ name }}</span>
+        <span class="tag-count">{{ count }}</span>
+      </a>
+      {{/tags}}
+      {{^tags}}
+      <p class="empty-state">还没有任何标签哦～</p>
+      {{/tags}}
+    </div>
+  </div>
+</div>

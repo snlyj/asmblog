@@ -1,0 +1,44 @@
+<div class="feed-wrap">
+  <section class="page-head-card reveal">
+    <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+    <span class="candy-badge candy-sky">✦ INSTANT SEARCH</span>
+    <h1>站内小搜索</h1>
+    <p class="muted">纯静态实时检索（桌面端随时按 <code>/</code> 键快速聚焦搜索框）</p>
+    <form id="search-form" action="/search/" method="get" class="search-bar">
+      <input id="search-input" type="search" name="q" value="{{ query }}" placeholder="输入关键词，寻找 {{ author }} 的笔记..." autocomplete="off">
+      <button type="submit">搜索 ✦</button>
+    </form>
+  </section>
+
+  <section id="search-results" class="post-list">
+    {{#posts}}
+    <article class="post-card reveal">
+      <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+      {{#cover}}
+      <a class="post-cover-link" href="/post/{{ slug }}/">
+        <img class="post-cover" src="{{ cover }}" alt="{{ title }}" loading="lazy" decoding="async">
+      </a>
+      {{/cover}}
+      <div class="post-meta">
+        {{#category}}<a class="cat-badge" href="/category/{{ category }}/">✦ {{ category }}</a>{{/category}}
+        <time>{{ date }}</time>
+        <span class="meta-dot">✦</span>
+        <span>约 {{ read_min }} 分钟阅读</span>
+      </div>
+      <h2 class="post-card-title">
+        <a href="/post/{{ slug }}/">{{ title }}</a>
+      </h2>
+      <p class="post-summary">{{ summary }}</p>
+      <div class="post-card-foot">
+        <div class="tag-row">{{{ tags_html }}}</div>
+        <a class="read-more" href="/post/{{ slug }}/">阅读全文 <span aria-hidden="true">&rarr;</span></a>
+      </div>
+    </article>
+    {{/posts}}
+    {{^posts}}
+    {{#query}}
+    <div class="empty-state reveal">没有找到与「{{ query }}」相关的笔记呢，换个关键词试试吧～</div>
+    {{/query}}
+    {{/posts}}
+  </section>
+</div>

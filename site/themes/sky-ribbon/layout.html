@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ page_title }} &middot; {{ site_name }}</title>
+  <meta name="description" content="{{ site_subtitle }}">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon-ribbon.svg?v=2">
+  <link rel="alternate" type="application/rss+xml" title="{{ site_name }} RSS" href="/rss.xml">
+  <link rel="stylesheet" href="/static/sky-ribbon.css?v=7">
+  <script>
+    (function(){
+      var t = localStorage.getItem('jiehua-theme');
+      if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+      document.documentElement.setAttribute('data-theme', t || 'light');
+      if (localStorage.getItem('jiehua-fx') === 'off') {
+        document.documentElement.setAttribute('data-fx', 'off');
+      }
+    })();
+  </script>
+</head>
+<body>
+  {{> header }}
+
+  <div id="pjax-stage" class="pjax-stage">
+    <main class="page-shell main-content">
+      {{{ body }}}
+    </main>
+  </div>
+
+  {{> footer }}
+  <script src="/static/sky-ribbon.js?v=7" defer></script>
+</body>
+</html>

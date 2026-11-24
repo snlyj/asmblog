@@ -1,0 +1,48 @@
+<section class="hero">
+  <div class="hero-kicker">STATIC BLOG &middot; X86-64 ASSEMBLY</div>
+  <h1>{{ site_name }}</h1>
+  <p class="hero-sub">{{ site_subtitle }}</p>
+  <div class="hero-stats">
+    <span>{{ post_count }} 篇文章</span>
+    <span>&middot;</span>
+    <span>{{ tag_count }} 个标签</span>
+    <span>&middot;</span>
+    <a href="/rss.xml">订阅 RSS</a>
+  </div>
+</section>
+
+<section class="post-list">
+  {{#posts}}
+  <article class="post-card">
+    <div class="post-meta">
+      <time>{{ date }}</time>
+      <span>&middot;</span>
+      <span>约 {{ read_min }} 分钟阅读</span>
+    </div>
+    <h2 class="post-card-title">
+      <a href="/post/{{ slug }}/">{{ title }}</a>
+    </h2>
+    <p class="post-summary">{{ summary }}</p>
+    <div class="tag-row">{{{ tags_html }}}</div>
+  </article>
+  {{/posts}}
+  {{^posts}}
+  <div class="empty-state">
+    <p>还没有发布任何文章。运行 <code>asmblog new hello "第一篇文章"</code> 开始写作吧！</p>
+  </div>
+  {{/posts}}
+</section>
+
+<nav class="pager" aria-label="Pagination">
+  <div class="pager-slot">
+    {{#prev_page_url}}
+    <a class="pager-btn" href="{{ prev_page_url }}">&larr; 上一页</a>
+    {{/prev_page_url}}
+  </div>
+  <span class="pager-info">第 {{ page_num }} / {{ total_pages }} 页</span>
+  <div class="pager-slot pager-right">
+    {{#next_page_url}}
+    <a class="pager-btn" href="{{ next_page_url }}">下一页 &rarr;</a>
+    {{/next_page_url}}
+  </div>
+</nav>
