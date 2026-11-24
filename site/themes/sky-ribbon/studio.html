@@ -808,6 +808,35 @@
         <label for="s-new-pass">修改后台口令（留空则保持原口令）</label>
         <input id="s-new-pass" class="inp" type="password" autocomplete="new-password" placeholder="至少 4 位，修改后其他设备自动下线">
       </div>
+
+      <!-- Optional Zero-Bloat Giscus Comments -->
+      <div class="field field-full">
+        <label for="s-giscus-snippet">💬 评论区快速配置（可选，基于 GitHub Discussions · 留空则彻底关闭评论、零脚本加载）</label>
+        <div class="cover-ctrl">
+          <div class="cover-btns">
+            <input id="s-giscus-snippet" class="inp" type="text" placeholder="直接粘贴从 giscus.app/zh-CN 复制的 <script> 代码片段，点击右侧一键识别">
+            <button id="s-giscus-parse" class="btn btn-soft btn-sm" type="button">✨ 自动识别</button>
+            <button id="s-giscus-clear" class="btn btn-sm" type="button">清空关闭</button>
+          </div>
+          <span class="field-hint">前往 <a href="https://giscus.app/zh-CN" target="_blank" rel="noopener">giscus.app/zh-CN</a> 安装到你的公开仓库后，把页面底部的代码粘贴进来自动提取 4 项参数，再点底部保存即可。</span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="s-g-repo">Giscus 仓库 (data-repo)</label>
+        <input id="s-g-repo" class="inp" type="text" placeholder="例如：snlyj/asmblog">
+      </div>
+      <div class="field">
+        <label for="s-g-rid">Giscus 仓库 ID (data-repo-id)</label>
+        <input id="s-g-rid" class="inp" type="text" placeholder="例如：R_kgDO...">
+      </div>
+      <div class="field">
+        <label for="s-g-cat">Giscus 分类名 (data-category)</label>
+        <input id="s-g-cat" class="inp" type="text" placeholder="例如：General 或 Announcements">
+      </div>
+      <div class="field">
+        <label for="s-g-cid">Giscus 分类 ID (data-category-id)</label>
+        <input id="s-g-cid" class="inp" type="text" placeholder="例如：DIC_kwDO...">
+      </div>
     </div>
 
     <div class="editor-footer">
@@ -1779,6 +1808,11 @@
   var sBannerFile = document.getElementById('s-banner-file');
   var sStudioPath = document.getElementById('s-studio-path');
   var sNewPass = document.getElementById('s-new-pass');
+  var sGiscusSnippet = document.getElementById('s-giscus-snippet');
+  var sGRepo = document.getElementById('s-g-repo');
+  var sGRid = document.getElementById('s-g-rid');
+  var sGCat = document.getElementById('s-g-cat');
+  var sGCid = document.getElementById('s-g-cid');
   var saveSettingsBtn = document.getElementById('save-settings-btn');
   var topBrandName = document.getElementById('top-brand-name');
   var topAvatar = document.getElementById('top-avatar');
@@ -1795,6 +1829,10 @@
     sAvatarUrl.value = cfg.avatar_url || '/static/avatar.jpg?v=2';
     sBannerUrl.value = cfg.banner_url || '/static/hero-banner.jpg?v=2';
     sStudioPath.value = cfg.studio_path || '/studio';
+    sGRepo.value = cfg.giscus_repo || '';
+    sGRid.value = cfg.giscus_repo_id || '';
+    sGCat.value = cfg.giscus_category || '';
+    sGCid.value = cfg.giscus_category_id || '';
     sAvatarPrev.src = sAvatarUrl.value;
     sBannerPrev.src = sBannerUrl.value;
     if (cfg.site_name) {
@@ -1857,6 +1895,35 @@
     sBannerFile.value = '';
   });
 
+  document.getElementById('s-giscus-parse').addEventListener('click', function () {
+    var raw = (sGiscusSnippet.value || '').trim();
+    if (!raw) { showToast('请先粘贴 giscus.app 的 <script> 代码片段', true); return; }
+    function pick(attr) {
+      var m = raw.match(new RegExp(attr + '\\s*=\\s*["\']([^"\']+)["\']', 'i'));
+      return m ? m[1].trim() : '';
+    }
+    var r = pick('data-repo'), rid = pick('data-repo-id'), c = pick('data-category'), cid = pick('data-category-id');
+    if (!r && !rid && !cid) {
+      showToast('未识别到 data-repo / data-repo-id 参数，请检查粘贴内容', true);
+      return;
+    }
+    if (r) sGRepo.value = r;
+    if (rid) sGRid.value = rid;
+    if (c) sGCat.value = c;
+    if (cid) sGCid.value = cid;
+    sGiscusSnippet.value = '';
+    showToast('已自动识别 Giscus 参数，点击「保存站点设置」立即生效 ✦');
+  });
+
+  document.getElementById('s-giscus-clear').addEventListener('click', function () {
+    sGiscusSnippet.value = '';
+    sGRepo.value = '';
+    sGRid.value = '';
+    sGCat.value = '';
+    sGCid.value = '';
+    showToast('已清空评论区配置，点击「保存站点设置」即可关闭评论');
+  });
+
   saveSettingsBtn.addEventListener('click', function () {
     var payload = {
       site_name: sSiteName.value.trim(),
@@ -1867,7 +1934,11 @@
       per_page: String(sPerPage.value || '6').trim(),
       avatar_url: sAvatarUrl.value.trim(),
       banner_url: sBannerUrl.value.trim(),
-      studio_path: sStudioPath.value.trim()
+      studio_path: sStudioPath.value.trim(),
+      giscus_repo: sGRepo.value.trim(),
+      giscus_repo_id: sGRid.value.trim(),
+      giscus_category: sGCat.value.trim(),
+      giscus_category_id: sGCid.value.trim()
     };
     var np = sNewPass.value;
     if (np) payload.new_password = np;

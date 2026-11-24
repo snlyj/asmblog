@@ -446,6 +446,47 @@ make_auto_summary:
     jae .Lmas_done
     mov al, [r12 + rbx]
     inc rbx
+    # Strip Markdown images ![alt](url)
+    cmp al, '!'
+    jne .Lmas_chk_lbr
+    cmp rbx, r13
+    jae .Lmas_put
+    cmp byte ptr [r12 + rbx], '['
+    jne .Lmas_put
+    inc rbx
+.Lmas_skip_img_alt:
+    cmp rbx, r13
+    jae .Lmas_done
+    mov dl, [r12 + rbx]
+    inc rbx
+    cmp dl, 10
+    je .Lmas_loop
+    cmp dl, ']'
+    jne .Lmas_skip_img_alt
+    jmp .Lmas_maybe_url
+.Lmas_chk_lbr:
+    # Keep link text from [text](url), strip brackets and (url)
+    cmp al, '['
+    je .Lmas_loop
+    cmp al, ']'
+    jne .Lmas_chk_md
+.Lmas_maybe_url:
+    cmp rbx, r13
+    jae .Lmas_done
+    cmp byte ptr [r12 + rbx], '('
+    jne .Lmas_loop
+    inc rbx
+.Lmas_skip_url:
+    cmp rbx, r13
+    jae .Lmas_done
+    mov dl, [r12 + rbx]
+    inc rbx
+    cmp dl, 10
+    je .Lmas_loop
+    cmp dl, ')'
+    jne .Lmas_skip_url
+    jmp .Lmas_loop
+.Lmas_chk_md:
     cmp al, '#'
     je .Lmas_loop
     cmp al, '*'

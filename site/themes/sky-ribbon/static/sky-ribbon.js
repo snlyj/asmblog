@@ -220,9 +220,25 @@
     try { localStorage.setItem(key, val); } catch (_) { /* storage disabled: keep in-memory state only */ }
   }
 
+  function giscusThemeFor(mode) {
+    return mode === 'dark' ? 'noborder_dark' : 'noborder_light';
+  }
+
+  function syncGiscusTheme(mode) {
+    var iframe = document.querySelector('iframe.giscus-frame');
+    if (!iframe || !iframe.contentWindow) return;
+    try {
+      iframe.contentWindow.postMessage(
+        { giscus: { setConfig: { theme: giscusThemeFor(mode) } } },
+        'https://giscus.app'
+      );
+    } catch (_) {}
+  }
+
   function applyTheme(next) {
     root.setAttribute('data-theme', next);
     store('asmblog-theme', next);
+    syncGiscusTheme(next);
   }
 
   if (themeBtn) {
@@ -885,12 +901,63 @@
     syncCatBarFade();
   }
 
+  function initComments() {
+    var card = document.getElementById('comments-card');
+    var mount = document.getElementById('giscus-mount');
+    if (!card || !mount || card.dataset.giscusInit) return;
+    var repo = (card.getAttribute('data-repo') || '').trim();
+    var repoId = (card.getAttribute('data-repo-id') || '').trim();
+    var cat = (card.getAttribute('data-category') || '').trim();
+    var catId = (card.getAttribute('data-category-id') || '').trim();
+    if (!repo || !repoId || !catId) {
+      mount.innerHTML = '<p class="comments-loading">评论区尚未填写完整的 Giscus 仓库与分类 ID（请在后台「⚙️ 站点设置」补全）。</p>';
+      return;
+    }
+    card.dataset.giscusInit = '1';
+
+    function loadGiscus() {
+      if (card.dataset.giscusLoaded) return;
+      card.dataset.giscusLoaded = '1';
+      mount.innerHTML = '';
+      var sc = document.createElement('script');
+      sc.src = 'https://giscus.app/client.js';
+      sc.async = true;
+      sc.crossOrigin = 'anonymous';
+      sc.setAttribute('data-repo', repo);
+      sc.setAttribute('data-repo-id', repoId);
+      sc.setAttribute('data-category', cat || 'General');
+      sc.setAttribute('data-category-id', catId);
+      sc.setAttribute('data-mapping', 'pathname');
+      sc.setAttribute('data-strict', '0');
+      sc.setAttribute('data-reactions-enabled', '1');
+      sc.setAttribute('data-emit-metadata', '0');
+      sc.setAttribute('data-input-position', 'top');
+      sc.setAttribute('data-theme', giscusThemeFor(root.getAttribute('data-theme')));
+      sc.setAttribute('data-lang', 'zh-CN');
+      sc.setAttribute('data-loading', 'lazy');
+      mount.appendChild(sc);
+    }
+
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        if (entries.some(function (en) { return en.isIntersecting; })) {
+          io.disconnect();
+          loadGiscus();
+        }
+      }, { rootMargin: '260px 0px' });
+      io.observe(card);
+    } else {
+      loadGiscus();
+    }
+  }
+
   function hydratePage(animate) {
     if (animate) animateStageCards();
     enhanceImages();
     enhanceCodeBlocks();
     initArticleExtras();
     initArchiveYears();
+    initComments();
     initLightbox();
     bindAvatarBoing();
     initSearch();

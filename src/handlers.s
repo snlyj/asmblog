@@ -14,6 +14,9 @@ render_q_buf:       .skip 512       # decoded query or tag param
 render_num_bufs:    .skip 256       # numeric string slots (8 * 32 bytes)
 render_url_prev:    .skip 128
 render_url_next:    .skip 128
+render_og_url:      .skip 512
+render_og_img:      .skip 512
+render_og_path:     .skip 256
 
 # Active filtered post list for {{#posts}} section rendering
 cur_list_ptrs:      .skip MAX_POSTS * 8
@@ -39,6 +42,32 @@ k_avatar_url:    .ascii "avatar_url"
 .equ k_avatar_url_len, . - k_avatar_url
 k_banner_url:    .ascii "banner_url"
 .equ k_banner_url_len, . - k_banner_url
+k_giscus_repo:   .ascii "giscus_repo"
+.equ k_giscus_repo_len, . - k_giscus_repo
+k_giscus_rid:    .ascii "giscus_repo_id"
+.equ k_giscus_rid_len, . - k_giscus_rid
+k_giscus_cat:    .ascii "giscus_category"
+.equ k_giscus_cat_len, . - k_giscus_cat
+k_giscus_cid:    .ascii "giscus_category_id"
+.equ k_giscus_cid_len, . - k_giscus_cid
+k_og_type:       .ascii "og_type"
+.equ k_og_type_len, . - k_og_type
+k_og_title:      .ascii "og_title"
+.equ k_og_title_len, . - k_og_title
+k_og_desc:       .ascii "og_desc"
+.equ k_og_desc_len, . - k_og_desc
+k_og_url:        .ascii "og_url"
+.equ k_og_url_len, . - k_og_url
+k_og_image:      .ascii "og_image"
+.equ k_og_image_len, . - k_og_image
+s_og_website:    .ascii "website"
+.equ s_og_website_len, . - s_og_website
+s_og_article:    .ascii "article"
+.equ s_og_article_len, . - s_og_article
+s_og_post_pre:   .ascii "/post/"
+.equ s_og_post_pre_len, . - s_og_post_pre
+s_http_p:        .ascii "http://"
+s_https_p:       .ascii "https://"
 k_page_title:    .ascii "page_title"
 .equ k_page_title_len, . - k_page_title
 k_body:          .ascii "body"
@@ -329,6 +358,65 @@ send_200_ct_nocache:
 
 # --- Template Context Helpers ---
 
+# build_abs_url(rdi=out_buf_512, rdx=rel_ptr, rcx=rel_len) -> rax=out_buf, rdx=len
+build_abs_url:
+    push rbx
+    push r12
+    push r13
+    push r14
+    sub rsp, 40
+    mov r12, rdi
+    mov r13, rdx
+    mov r14, rcx
+
+    mov rdi, rsp
+    mov rsi, r12
+    mov edx, 511
+    call sb_init
+
+    cmp r14, 7
+    jb .Lbau_rel
+    mov rdi, r13; mov esi, 7; lea rdx, [rip + s_http_p]; mov ecx, 7; call xslice_eq_ci
+    test eax, eax
+    jnz .Lbau_copy_raw
+    cmp r14, 8
+    jb .Lbau_rel
+    mov rdi, r13; mov esi, 8; lea rdx, [rip + s_https_p]; mov ecx, 8; call xslice_eq_ci
+    test eax, eax
+    jnz .Lbau_copy_raw
+
+.Lbau_rel:
+    lea rbx, [rip + g_cfg_site_url]
+    mov rcx, [rip + g_cfg_site_url_len]
+    test rcx, rcx
+    jz .Lbau_no_base
+    cmp byte ptr [rbx + rcx - 1], '/'
+    jne .Lbau_add_base
+    dec rcx
+.Lbau_add_base:
+    mov rdi, rsp; mov rsi, rbx; mov rdx, rcx; call sb_mem
+.Lbau_no_base:
+    test r14, r14
+    jz .Lbau_slash
+    cmp byte ptr [r13], '/'
+    je .Lbau_copy_raw
+    mov rdi, rsp; mov esi, '/'; call sb_byte
+    jmp .Lbau_copy_raw
+.Lbau_slash:
+    mov rdi, rsp; mov esi, '/'; call sb_byte
+    jmp .Lbau_done
+.Lbau_copy_raw:
+    mov rdi, rsp; mov rsi, r13; mov rdx, r14; call sb_mem
+.Lbau_done:
+    mov rax, r12
+    mov rdx, [rsp + SB_LEN]
+    add rsp, 40
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
 # ctx_reset() -> initializes g_vars with global site variables
 ctx_reset:
     push rbx
@@ -361,6 +449,50 @@ ctx_reset:
 
     lea rdi, [rip + k_banner_url];    mov esi, k_banner_url_len
     lea rdx, [rip + g_cfg_banner];    mov rcx, [rip + g_cfg_banner_len];    call ctx_set
+
+    lea rdi, [rip + k_giscus_repo];   mov esi, k_giscus_repo_len
+    lea rdx, [rip + g_cfg_giscus_repo]; mov rcx, [rip + g_cfg_giscus_repo_len]; call ctx_set
+
+    lea rdi, [rip + k_giscus_rid];    mov esi, k_giscus_rid_len
+    lea rdx, [rip + g_cfg_giscus_repo_id]; mov rcx, [rip + g_cfg_giscus_repo_id_len]; call ctx_set
+
+    lea rdi, [rip + k_giscus_cat];    mov esi, k_giscus_cat_len
+    lea rdx, [rip + g_cfg_giscus_cat]; mov rcx, [rip + g_cfg_giscus_cat_len]; call ctx_set
+
+    lea rdi, [rip + k_giscus_cid];    mov esi, k_giscus_cid_len
+    lea rdx, [rip + g_cfg_giscus_cat_id]; mov rcx, [rip + g_cfg_giscus_cat_id_len]; call ctx_set
+
+    # Default Open Graph / Twitter Card metadata (overridden per article in render_post_page)
+    lea rdi, [rip + k_og_type];       mov esi, k_og_type_len
+    lea rdx, [rip + s_og_website];    mov ecx, s_og_website_len;            call ctx_set
+
+    lea rdi, [rip + k_og_title];      mov esi, k_og_title_len
+    lea rdx, [rip + g_cfg_site_name]; mov rcx, [rip + g_cfg_site_name_len]; call ctx_set
+
+    lea rdi, [rip + k_og_desc];       mov esi, k_og_desc_len
+    lea rdx, [rip + g_cfg_subtitle];  mov rcx, [rip + g_cfg_subtitle_len];  call ctx_set
+
+    lea rdi, [rip + render_og_url]
+    xor edx, edx
+    xor ecx, ecx
+    call build_abs_url
+    push rax
+    push rdx
+    lea rdi, [rip + k_og_url];        mov esi, k_og_url_len
+    pop rcx
+    pop rdx
+    call ctx_set
+
+    lea rdi, [rip + render_og_img]
+    lea rdx, [rip + g_cfg_banner]
+    mov rcx, [rip + g_cfg_banner_len]
+    call build_abs_url
+    push rax
+    push rdx
+    lea rdi, [rip + k_og_image];      mov esi, k_og_image_len
+    pop rcx
+    pop rdx
+    call ctx_set
 
     # post_count -> slot 0
     mov rdi, [rip + g_pub_count]
@@ -1071,6 +1203,50 @@ render_post_page:
     lea rdi, [rip + k_page_title]; mov esi, k_page_title_len
     mov rdx, [r12 + POST_TITLE_PTR]; mov rcx, [r12 + POST_TITLE_LEN]; call ctx_set
 
+    # Article-specific Open Graph / Twitter Card metadata
+    lea rdi, [rip + k_og_type];  mov esi, k_og_type_len
+    lea rdx, [rip + s_og_article]; mov ecx, s_og_article_len; call ctx_set
+
+    lea rdi, [rip + k_og_title]; mov esi, k_og_title_len
+    mov rdx, [r12 + POST_TITLE_PTR]; mov rcx, [r12 + POST_TITLE_LEN]; call ctx_set
+
+    cmp qword ptr [r12 + POST_SUMMARY_LEN], 0
+    je .Lrpp_og_url
+    lea rdi, [rip + k_og_desc];  mov esi, k_og_desc_len
+    mov rdx, [r12 + POST_SUMMARY_PTR]; mov rcx, [r12 + POST_SUMMARY_LEN]; call ctx_set
+
+.Lrpp_og_url:
+    sub rsp, 32
+    mov rdi, rsp; lea rsi, [rip + render_og_path]; mov edx, 255; call sb_init
+    mov rdi, rsp; lea rsi, [rip + s_og_post_pre]; mov edx, s_og_post_pre_len; call sb_mem
+    mov rdi, rsp; mov rsi, [r12 + POST_SLUG_PTR]; mov rdx, [r12 + POST_SLUG_LEN]; call sb_mem
+    mov rdi, rsp; mov esi, '/'; call sb_byte
+    lea rdi, [rip + render_og_url]
+    lea rdx, [rip + render_og_path]
+    mov rcx, [rsp + SB_LEN]
+    call build_abs_url
+    add rsp, 32
+    push rax
+    push rdx
+    lea rdi, [rip + k_og_url];   mov esi, k_og_url_len
+    pop rcx
+    pop rdx
+    call ctx_set
+
+    cmp qword ptr [r12 + POST_COVER_LEN], 0
+    je .Lrpp_bind
+    lea rdi, [rip + render_og_img]
+    mov rdx, [r12 + POST_COVER_PTR]
+    mov rcx, [r12 + POST_COVER_LEN]
+    call build_abs_url
+    push rax
+    push rdx
+    lea rdi, [rip + k_og_image]; mov esi, k_og_image_len
+    pop rcx
+    pop rdx
+    call ctx_set
+
+.Lrpp_bind:
     mov rdi, r12
     call bind_post_vars
 

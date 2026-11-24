@@ -24,3 +24,11 @@ studio_path = /studio
 # Generate with: ./asmblog hash-pass "your-strong-passphrase"
 # Leave empty to completely disable Author Studio in pure read-only mode
 studio_pass_sha256 =
+
+# Optional zero-bloat Giscus comments (powered by GitHub Discussions)
+# Configure at https://giscus.app/zh-CN or paste the snippet inside Author Studio Settings.
+# Leave giscus_repo empty to completely disable comments (zero external requests).
+giscus_repo =
+giscus_repo_id =
+giscus_category =
+giscus_category_id =

@@ -302,24 +302,32 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v9 = http_req("/static/sky-ribbon.css?v=9")
+        st_imm, hdrs_imm, css_v10 = http_req("/static/sky-ribbon.css?v=10")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v9)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v10)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
-        for required_css in (b"hover: hover", b".lightbox", b".pjax-loader", b".post-grid", b".toc-desktop", b".toc-mobile", b".sky-toast", b".search-hl", b".archive-year"):
+        for required_css in (b"hover: hover", b".lightbox", b".pjax-loader", b".post-grid", b".toc-desktop", b".toc-mobile", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
             assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v9 = http_req("/static/sky-ribbon.js?v=9")
+        st_js, _, js_v10 = http_req("/static/sky-ribbon.js?v=10")
         assert_eq(st_js, 200, "versioned static js 200")
-        for required_js in (b"img-lightbox", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"setLightboxZoom", b"showToast", b"highlightText"):
-            assert required_js in js_v9, f"missing expected UI JS feature: {required_js!r}"
+        for required_js in (b"img-lightbox", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText"):
+            assert required_js in js_v10, f"missing expected UI JS feature: {required_js!r}"
+
+        # Open Graph / Twitter Card social preview meta + zero-bloat Giscus hidden by default
+        assert 'property="og:type" content="website"' in home_txt
+        assert 'property="og:image" content="http://127.0.0.1:18080/static/hero-banner.jpg?v=2"' in home_txt
+        assert 'name="twitter:card" content="summary_large_image"' in home_txt
 
         st_post, _, post_html = http_req("/post/welcome-to-asmblog/")
         assert_eq(st_post, 200, "GET /post/welcome-to-asmblog/")
         post_txt = post_html.decode("utf-8")
         assert "article-toc-slot" in post_txt and "share-post-btn" in post_txt, "article TOC/share hooks missing"
+        assert 'property="og:type" content="article"' in post_txt
+        assert 'property="og:url" content="http://127.0.0.1:18080/post/welcome-to-asmblog/"' in post_txt
+        assert "comments-card" not in post_txt, "Giscus comments must stay completely absent when unconfigured"
 
         # 4. 404 & 405 Read-Only Enforcement
         st, _, _ = http_req("/does-not-exist")
@@ -597,15 +605,24 @@ def test_server():
                 "site_name": "Starlight Anime Blog",
                 "footer_text": "Custom Live Footer ♡",
                 "studio_path": "/my-secret-room",
+                "giscus_repo": "snlyj/asmblog",
+                "giscus_repo_id": "R_kgDOTest123",
+                "giscus_category": "General",
+                "giscus_category_id": "DIC_kwDOTest456",
                 "new_password": "new-strong-pass",
             }).encode(),
         )
         assert_eq(st_ss, 200, "POST /api/studio/settings")
         assert_eq(json.loads(ss_body)["studio_path"], "/my-secret-room")
 
-        # Verify instant hot-reload of appearance & custom studio_path (old /studio -> 404!)
+        # Verify instant hot-reload of appearance, Giscus comments & custom studio_path (old /studio -> 404!)
         new_home = http_req("/")[2].decode("utf-8")
         assert "Starlight Anime Blog" in new_home and "Custom Live Footer ♡" in new_home
+        new_post = http_req("/post/welcome-to-asmblog/")[2].decode("utf-8")
+        assert 'data-repo="snlyj/asmblog"' in new_post and 'data-category-id="DIC_kwDOTest456"' in new_post, "Giscus comments must hot-reload onto article pages"
+        sg_after = json.loads(http_req("/api/studio/settings", headers=cookie_hdr)[2])
+        assert_eq(sg_after["giscus_repo"], "snlyj/asmblog")
+        assert_eq(sg_after["giscus_category_id"], "DIC_kwDOTest456")
         assert_eq(http_req("/studio")[0], 404, "old /studio must 404 after studio_path changed")
         assert_eq(http_req("/my-secret-room")[0], 200, "new custom studio_path must return 200")
 

@@ -48,6 +48,10 @@ st_s_spath:     .skip 128
 st_s_perpage:   .skip 32
 st_s_newpass:   .skip 256
 st_s_newhash:   .skip 65
+st_s_g_repo:    .skip 128
+st_s_g_rid:     .skip 128
+st_s_g_cat:     .skip 128
+st_s_g_cid:     .skip 128
 
 .section .rodata
 st_tpl_name:    .ascii "studio"
@@ -115,6 +119,14 @@ jk_per_page:    .ascii "per_page"
 .equ jk_per_page_len, . - jk_per_page
 jk_new_pass:    .ascii "new_password"
 .equ jk_new_pass_len, . - jk_new_pass
+jk_g_repo:      .ascii "giscus_repo"
+.equ jk_g_repo_len, . - jk_g_repo
+jk_g_rid:       .ascii "giscus_repo_id"
+.equ jk_g_rid_len, . - jk_g_rid
+jk_g_cat:       .ascii "giscus_category"
+.equ jk_g_cat_len, . - jk_g_cat
+jk_g_cid:       .ascii "giscus_category_id"
+.equ jk_g_cid_len, . - jk_g_cid
 jv_true:        .ascii "true"
 .equ jv_true_len, . - jv_true
 jv_one:         .ascii "1"
@@ -218,6 +230,14 @@ js_8:           .ascii "\",\"studio_path\":\""
 .equ js_8_len, . - js_8
 js_9:           .ascii "\",\"per_page\":"
 .equ js_9_len, . - js_9
+js_10:          .ascii ",\"giscus_repo\":\""
+.equ js_10_len, . - js_10
+js_11:          .ascii "\",\"giscus_repo_id\":\""
+.equ js_11_len, . - js_11
+js_12:          .ascii "\",\"giscus_category\":\""
+.equ js_12_len, . - js_12
+js_13:          .ascii "\",\"giscus_category_id\":\""
+.equ js_13_len, . - js_13
 
 # config.ini writer fragments
 ci_head:        .ascii "# AsmBlog Configuration\nsite_name = "
@@ -246,6 +266,14 @@ ci_spath:       .ascii "\nstudio_path = "
 .equ ci_spath_len, . - ci_spath
 ci_shash:       .ascii "\nstudio_pass_sha256 = "
 .equ ci_shash_len, . - ci_shash
+ci_g_repo:      .ascii "\ngiscus_repo = "
+.equ ci_g_repo_len, . - ci_g_repo
+ci_g_rid:       .ascii "\ngiscus_repo_id = "
+.equ ci_g_rid_len, . - ci_g_rid
+ci_g_cat:       .ascii "\ngiscus_category = "
+.equ ci_g_cat_len, . - ci_g_cat
+ci_g_cid:       .ascii "\ngiscus_category_id = "
+.equ ci_g_cid_len, . - ci_g_cid
 st_def_cfg:     .asciz "config.ini"
 
 # Front-Matter fragments
@@ -1870,7 +1898,15 @@ handle_studio_settings_get:
     mov rdi, rsp; lea rsi, [rip + g_cfg_studio_path]; mov rdx, [rip + g_cfg_studio_path_len]; call sb_esc_json
     mov rdi, rsp; lea rsi, [rip + js_9]; mov edx, js_9_len; call sb_mem
     mov rdi, rsp; mov rsi, [rip + g_cfg_per_page]; call sb_uint
-    mov rdi, rsp; mov esi, '}'; call sb_byte
+    mov rdi, rsp; lea rsi, [rip + js_10]; mov edx, js_10_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + g_cfg_giscus_repo]; mov rdx, [rip + g_cfg_giscus_repo_len]; call sb_esc_json
+    mov rdi, rsp; lea rsi, [rip + js_11]; mov edx, js_11_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + g_cfg_giscus_repo_id]; mov rdx, [rip + g_cfg_giscus_repo_id_len]; call sb_esc_json
+    mov rdi, rsp; lea rsi, [rip + js_12]; mov edx, js_12_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + g_cfg_giscus_cat]; mov rdx, [rip + g_cfg_giscus_cat_len]; call sb_esc_json
+    mov rdi, rsp; lea rsi, [rip + js_13]; mov edx, js_13_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + g_cfg_giscus_cat_id]; mov rdx, [rip + g_cfg_giscus_cat_id_len]; call sb_esc_json
+    mov rdi, rsp; lea rsi, [rip + j_close_obj]; mov edx, j_close_obj_len; call sb_mem
 
     mov rdi, r12
     lea rsi, [rip + st_200]
@@ -1897,7 +1933,7 @@ handle_studio_settings_save:
     push r13
     push r14
     push r15
-    sub rsp, 200
+    sub rsp, 264
     mov r12, rdi
     mov r13, rsi
 
@@ -1925,6 +1961,10 @@ handle_studio_settings_save:
     mov rax, [rip + g_cfg_per_page];    mov [rsp + 152], rax
     lea rax, [rip + g_cfg_studio_hash]; mov [rsp + 160], rax
     mov qword ptr [rsp + 168], 0
+    lea rax, [rip + g_cfg_giscus_repo];    mov [rsp + 184], rax; mov rax, [rip + g_cfg_giscus_repo_len];    mov [rsp + 192], rax
+    lea rax, [rip + g_cfg_giscus_repo_id]; mov [rsp + 200], rax; mov rax, [rip + g_cfg_giscus_repo_id_len]; mov [rsp + 208], rax
+    lea rax, [rip + g_cfg_giscus_cat];     mov [rsp + 216], rax; mov rax, [rip + g_cfg_giscus_cat_len];     mov [rsp + 224], rax
+    lea rax, [rip + g_cfg_giscus_cat_id];  mov [rsp + 232], rax; mov rax, [rip + g_cfg_giscus_cat_id_len];  mov [rsp + 240], rax
 
     # site_name (non-empty)
     mov rdi, rsp; lea rsi, [rip + st_s_site_name]; mov edx, 127; call sb_init
@@ -2057,10 +2097,10 @@ handle_studio_settings_save:
     mov rdi, rsp; lea rsi, [rip + st_s_newpass]; mov edx, 255; call sb_init
     mov rdi, r14; mov rsi, r15; lea rdx, [rip + jk_new_pass]; mov ecx, jk_new_pass_len; mov r8, rsp; call json_get_str
     test eax, eax
-    jz .Lhsss_build
+    jz .Lhsss_g_repo
     mov rsi, [rsp + SB_LEN]
     test rsi, rsi
-    jz .Lhsss_build
+    jz .Lhsss_g_repo
     cmp rsi, 4
     jb .Lhsss_shortpw
     lea rdi, [rip + st_s_newpass]
@@ -2069,6 +2109,38 @@ handle_studio_settings_save:
     lea rax, [rip + st_s_newhash]
     mov [rsp + 160], rax
     mov qword ptr [rsp + 168], 1
+
+.Lhsss_g_repo:
+    mov rdi, rsp; lea rsi, [rip + st_s_g_repo]; mov edx, 127; call sb_init
+    mov rdi, r14; mov rsi, r15; lea rdx, [rip + jk_g_repo]; mov ecx, jk_g_repo_len; mov r8, rsp; call json_get_str
+    test eax, eax
+    jz .Lhsss_g_rid
+    lea rdi, [rip + st_s_g_repo]; mov rsi, [rsp + SB_LEN]; call trim_ws
+    mov [rsp + 184], rax; mov [rsp + 192], rdx
+
+.Lhsss_g_rid:
+    mov rdi, rsp; lea rsi, [rip + st_s_g_rid]; mov edx, 127; call sb_init
+    mov rdi, r14; mov rsi, r15; lea rdx, [rip + jk_g_rid]; mov ecx, jk_g_rid_len; mov r8, rsp; call json_get_str
+    test eax, eax
+    jz .Lhsss_g_cat
+    lea rdi, [rip + st_s_g_rid]; mov rsi, [rsp + SB_LEN]; call trim_ws
+    mov [rsp + 200], rax; mov [rsp + 208], rdx
+
+.Lhsss_g_cat:
+    mov rdi, rsp; lea rsi, [rip + st_s_g_cat]; mov edx, 127; call sb_init
+    mov rdi, r14; mov rsi, r15; lea rdx, [rip + jk_g_cat]; mov ecx, jk_g_cat_len; mov r8, rsp; call json_get_str
+    test eax, eax
+    jz .Lhsss_g_cid
+    lea rdi, [rip + st_s_g_cat]; mov rsi, [rsp + SB_LEN]; call trim_ws
+    mov [rsp + 216], rax; mov [rsp + 224], rdx
+
+.Lhsss_g_cid:
+    mov rdi, rsp; lea rsi, [rip + st_s_g_cid]; mov edx, 127; call sb_init
+    mov rdi, r14; mov rsi, r15; lea rdx, [rip + jk_g_cid]; mov ecx, jk_g_cid_len; mov r8, rsp; call json_get_str
+    test eax, eax
+    jz .Lhsss_build
+    lea rdi, [rip + st_s_g_cid]; mov rsi, [rsp + SB_LEN]; call trim_ws
+    mov [rsp + 232], rax; mov [rsp + 240], rdx
 
 .Lhsss_build:
     mov rdi, rsp; lea rsi, [rip + st_file_buf]; mov edx, 16383; call sb_init
@@ -2098,6 +2170,14 @@ handle_studio_settings_save:
     mov rdi, rsp; mov rsi, [rsp + 136];       mov rdx, [rsp + 144];   call sb_ini_safe
     mov rdi, rsp; lea rsi, [rip + ci_shash];  mov edx, ci_shash_len;  call sb_mem
     mov rdi, rsp; mov rsi, [rsp + 160];       mov edx, 64;            call sb_mem
+    mov rdi, rsp; lea rsi, [rip + ci_g_repo]; mov edx, ci_g_repo_len; call sb_mem
+    mov rdi, rsp; mov rsi, [rsp + 184];       mov rdx, [rsp + 192];   call sb_ini_safe
+    mov rdi, rsp; lea rsi, [rip + ci_g_rid];  mov edx, ci_g_rid_len;  call sb_mem
+    mov rdi, rsp; mov rsi, [rsp + 200];       mov rdx, [rsp + 208];   call sb_ini_safe
+    mov rdi, rsp; lea rsi, [rip + ci_g_cat];  mov edx, ci_g_cat_len;  call sb_mem
+    mov rdi, rsp; mov rsi, [rsp + 216];       mov rdx, [rsp + 224];   call sb_ini_safe
+    mov rdi, rsp; lea rsi, [rip + ci_g_cid];  mov edx, ci_g_cid_len;  call sb_mem
+    mov rdi, rsp; mov rsi, [rsp + 232];       mov rdx, [rsp + 240];   call sb_ini_safe
     mov rdi, rsp; mov esi, 10;                call sb_byte
     mov rax, [rsp + SB_LEN]
     mov [rsp + 176], rax
@@ -2166,7 +2246,7 @@ handle_studio_settings_save:
     call studio_send_json
 
 .Lhsss_ret:
-    add rsp, 200
+    add rsp, 264
     pop r15
     pop r14
     pop r13

@@ -39,4 +39,21 @@
     <div class="post-nav-slot">{{#prev_slug}}<a class="post-nav-card" href="/post/{{ prev_slug }}/"><span class="post-nav-label">&larr; 上一篇</span><span class="post-nav-title">{{ prev_title }}</span></a>{{/prev_slug}}</div>
     <div class="post-nav-slot">{{#next_slug}}<a class="post-nav-card post-nav-right" href="/post/{{ next_slug }}/"><span class="post-nav-label">下一篇 &rarr;</span><span class="post-nav-title">{{ next_title }}</span></a>{{/next_slug}}</div>
   </nav>
+
+  {{#giscus_repo}}
+  <section id="comments-card" class="comments-card reveal"
+           data-repo="{{ giscus_repo }}"
+           data-repo-id="{{ giscus_repo_id }}"
+           data-category="{{ giscus_category }}"
+           data-category-id="{{ giscus_category_id }}"
+           aria-label="文章评论区">
+    <div class="comments-head">
+      <h2 class="comments-title">✦ 留下一句足迹</h2>
+      <span class="comments-note">GitHub Discussions · 同步昼夜主题</span>
+    </div>
+    <div id="giscus-mount" class="giscus-mount">
+      <p class="comments-loading">正在召唤评论区…</p>
+    </div>
+  </section>
+  {{/giscus_repo}}
 </div>

@@ -70,6 +70,26 @@ g_cfg_path:            .skip 512
 .globl g_cfg_path_len
 g_cfg_path_len:        .quad 0
 
+.globl g_cfg_giscus_repo
+g_cfg_giscus_repo:     .skip 128
+.globl g_cfg_giscus_repo_len
+g_cfg_giscus_repo_len: .quad 0
+
+.globl g_cfg_giscus_repo_id
+g_cfg_giscus_repo_id:     .skip 128
+.globl g_cfg_giscus_repo_id_len
+g_cfg_giscus_repo_id_len: .quad 0
+
+.globl g_cfg_giscus_cat
+g_cfg_giscus_cat:      .skip 128
+.globl g_cfg_giscus_cat_len
+g_cfg_giscus_cat_len:  .quad 0
+
+.globl g_cfg_giscus_cat_id
+g_cfg_giscus_cat_id:     .skip 128
+.globl g_cfg_giscus_cat_id_len
+g_cfg_giscus_cat_id_len: .quad 0
+
 .section .rodata
 def_site_name:   .ascii "AsmBlog"
 .equ def_site_name_len, . - def_site_name
@@ -118,6 +138,14 @@ key_banner:      .ascii "banner_url"
 .equ key_banner_len, . - key_banner
 key_studio_path: .ascii "studio_path"
 .equ key_studio_path_len, . - key_studio_path
+key_giscus_repo: .ascii "giscus_repo"
+.equ key_giscus_repo_len, . - key_giscus_repo
+key_giscus_rid:  .ascii "giscus_repo_id"
+.equ key_giscus_rid_len, . - key_giscus_rid
+key_giscus_cat:  .ascii "giscus_category"
+.equ key_giscus_cat_len, . - key_giscus_cat
+key_giscus_cid:  .ascii "giscus_category_id"
+.equ key_giscus_cid_len, . - key_giscus_cid
 
 .section .text
 
@@ -146,6 +174,14 @@ config_init_defaults:
     mov qword ptr [rip + g_cfg_per_page], 6
     mov qword ptr [rip + g_cfg_studio_hash_len], 0
     mov byte ptr [rip + g_cfg_studio_hash], 0
+    mov qword ptr [rip + g_cfg_giscus_repo_len], 0
+    mov byte ptr [rip + g_cfg_giscus_repo], 0
+    mov qword ptr [rip + g_cfg_giscus_repo_id_len], 0
+    mov byte ptr [rip + g_cfg_giscus_repo_id], 0
+    mov qword ptr [rip + g_cfg_giscus_cat_len], 0
+    mov byte ptr [rip + g_cfg_giscus_cat], 0
+    mov qword ptr [rip + g_cfg_giscus_cat_id_len], 0
+    mov byte ptr [rip + g_cfg_giscus_cat_id], 0
 
     lea rdi, [rip + g_cfg_site_name]
     mov esi, 128
@@ -544,7 +580,7 @@ config_load:
     mov ecx, key_studio_path_len
     call xslice_eq_ci
     test eax, eax
-    jz .Lcl_next_kv
+    jz .Lcl_k_gr
     # studio_path must start with '/', len 2..64, trailing '/' trimmed, rest safe slug
     mov rcx, [rsp + 8]
     mov r8, [rsp + 0]
@@ -572,6 +608,70 @@ config_load:
     lea rdi, [rip + g_cfg_studio_path]
     mov esi, 96
     lea rdx, [rip + g_cfg_studio_path_len]
+    call copy_cfg_str
+    jmp .Lcl_next_kv
+
+.Lcl_k_gr:
+    mov rdi, [rsp + 24]
+    mov rsi, [rsp + 16]
+    lea rdx, [rip + key_giscus_repo]
+    mov ecx, key_giscus_repo_len
+    call xslice_eq_ci
+    test eax, eax
+    jz .Lcl_k_grid
+    lea rdi, [rip + g_cfg_giscus_repo]
+    mov esi, 128
+    lea rdx, [rip + g_cfg_giscus_repo_len]
+    mov rcx, [rsp + 8]
+    mov r8, [rsp + 0]
+    call copy_cfg_str
+    jmp .Lcl_next_kv
+
+.Lcl_k_grid:
+    mov rdi, [rsp + 24]
+    mov rsi, [rsp + 16]
+    lea rdx, [rip + key_giscus_rid]
+    mov ecx, key_giscus_rid_len
+    call xslice_eq_ci
+    test eax, eax
+    jz .Lcl_k_gcat
+    lea rdi, [rip + g_cfg_giscus_repo_id]
+    mov esi, 128
+    lea rdx, [rip + g_cfg_giscus_repo_id_len]
+    mov rcx, [rsp + 8]
+    mov r8, [rsp + 0]
+    call copy_cfg_str
+    jmp .Lcl_next_kv
+
+.Lcl_k_gcat:
+    mov rdi, [rsp + 24]
+    mov rsi, [rsp + 16]
+    lea rdx, [rip + key_giscus_cat]
+    mov ecx, key_giscus_cat_len
+    call xslice_eq_ci
+    test eax, eax
+    jz .Lcl_k_gcid
+    lea rdi, [rip + g_cfg_giscus_cat]
+    mov esi, 128
+    lea rdx, [rip + g_cfg_giscus_cat_len]
+    mov rcx, [rsp + 8]
+    mov r8, [rsp + 0]
+    call copy_cfg_str
+    jmp .Lcl_next_kv
+
+.Lcl_k_gcid:
+    mov rdi, [rsp + 24]
+    mov rsi, [rsp + 16]
+    lea rdx, [rip + key_giscus_cid]
+    mov ecx, key_giscus_cid_len
+    call xslice_eq_ci
+    test eax, eax
+    jz .Lcl_next_kv
+    lea rdi, [rip + g_cfg_giscus_cat_id]
+    mov esi, 128
+    lea rdx, [rip + g_cfg_giscus_cat_id_len]
+    mov rcx, [rsp + 8]
+    mov r8, [rsp + 0]
     call copy_cfg_str
 
 .Lcl_next_kv:

@@ -1172,6 +1172,48 @@ input:focus-visible {
 /* Adjacent Post Nav */
 .post-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 22px; }
 .post-nav-slot:empty { display: none; }
+
+/* Optional Zero-Bloat Giscus Comment Card */
+.comments-card {
+  margin-top: 22px;
+  padding: 24px 28px;
+  border-radius: 22px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-card);
+  transition: background-color 0.36s var(--ease-silk), border-color 0.3s ease;
+}
+.comments-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1.5px dashed var(--border-strong);
+}
+.comments-title {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: var(--fg);
+}
+.comments-note {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sky-soft);
+  color: var(--sky-fg);
+}
+.giscus-mount { min-height: 96px; }
+.comments-loading {
+  margin: 12px 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+  text-align: center;
+}
 .post-nav-card {
   display: flex;
   flex-direction: column;
@@ -1752,6 +1794,7 @@ input:focus-visible {
   .post-card { padding: 0; }
   .post-body { padding: 16px 16px 18px; }
   .article-card { padding: 20px 16px 24px; }
+  .comments-card { padding: 18px 14px; border-radius: 18px; }
   .page-head-card { padding: 18px 16px; margin-bottom: 16px; }
   .tag-cloud-card { padding: 18px 16px; }
 
