@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://jiehua.13-58-183-35.sslip.io/"><img src="https://img.shields.io/badge/Live%20Demo-%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-ff7eb6?style=flat-square&logo=sparkles&logoColor=white" alt="Live Demo"></a>
   <a href="https://github.com/snlyj/asmblog/actions"><img src="https://img.shields.io/github/actions/workflow/status/snlyj/asmblog/ci.yml?style=flat-square&label=CI%20%26%20Tests" alt="CI Status"></a>
   <a href="https://github.com/snlyj/asmblog/releases"><img src="https://img.shields.io/github/v/release/snlyj/asmblog?style=flat-square&color=5cb8ff" alt="Release"></a>
   <img src="https://img.shields.io/badge/Arch-Linux%20x86__64-5cb8ff?style=flat-square" alt="Linux x86_64">
@@ -17,6 +18,10 @@
   <img src="https://img.shields.io/badge/Binary-~65%20KiB-b9a4ff?style=flat-square" alt="Binary Size">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-ffd86b?style=flat-square" alt="MIT License"></a>
 </p>
+
+> [!TIP]
+> **🌐 在线体验 / Live Demo**：👉 **[https://jiehua.13-58-183-35.sslip.io/](https://jiehua.13-58-183-35.sslip.io/)**
+> 实际运行于纯 x86-64 `asmblog`（65 KiB 单文件）+ Caddy 自动 HTTPS（HTTP/2 & HTTP/3），欢迎直接打开体验零白屏 PJAX 切页、圆形水波纹昼夜模式、高清插画灯箱、桌面/手机双端 60/120fps 顺滑度与站内极速搜索。
 
 ---
 
