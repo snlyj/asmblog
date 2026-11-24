@@ -157,8 +157,8 @@ def test_site_ssg_build():
         assert len(list(sm)) == 4  # home + 3 posts
 
         # Copied static assets
-        assert os.path.getsize(os.path.join(dist_tmp, "static/style.css")) > 500
-        assert os.path.getsize(os.path.join(dist_tmp, "static/app.js")) > 300
+        assert os.path.getsize(os.path.join(dist_tmp, "static/sky-ribbon.css")) > 500
+        assert os.path.getsize(os.path.join(dist_tmp, "static/sky-ribbon.js")) > 300
     finally:
         shutil.rmtree(dist_tmp, ignore_errors=True)
     print("[PASS] Main site SSG build (HTML, UTF-8 tags, JSON, RSS XML, Sitemap XML, static copy)")
@@ -223,8 +223,8 @@ def test_server():
             "/rss.xml",
             "/sitemap.xml",
             "/healthz",
-            "/static/style.css",
-            "/static/app.js",
+            "/static/sky-ribbon.css",
+            "/static/sky-ribbon.js",
             "/static/hero-banner.jpg",
             "/static/avatar.jpg",
             "/static/notfound.jpg",
@@ -263,26 +263,56 @@ def test_server():
         assert_eq(body, b"", "HEAD body must be empty")
 
         # 3. Static ETag + RFC-compliant 304 Not Modified + Smart Cache-Control
-        st, hdrs, body = http_req("/static/style.css")
+        st, hdrs, body = http_req("/static/sky-ribbon.css")
         etag = hdrs.get("ETag")
         assert etag and etag.startswith('"'), f"bad ETag: {etag}"
         assert "must-revalidate" in hdrs.get("Cache-Control", ""), f"expected must-revalidate: {hdrs}"
-        st304, hdrs304, body304 = http_req("/static/style.css", headers={"If-None-Match": etag})
+        st304, hdrs304, body304 = http_req("/static/sky-ribbon.css", headers={"If-None-Match": etag})
         assert_eq(st304, 304, "ETag 304")
         assert_eq(body304, b"", "304 body")
         assert "Content-Type" not in hdrs304, f"304 should omit Content-Type: {hdrs304}"
+        # RFC 9110 weak comparison: W/ prefix and ETag lists must also match
+        st_w, _, _ = http_req("/static/sky-ribbon.css", headers={"If-None-Match": "W/" + etag})
+        assert_eq(st_w, 304, "weak If-None-Match 304")
+        st_l, _, _ = http_req("/static/sky-ribbon.css", headers={"If-None-Match": '"nope", ' + etag})
+        assert_eq(st_l, 304, "If-None-Match list 304")
+        st_m, _, _ = http_req("/static/sky-ribbon.css", headers={"If-None-Match": '"nope"'})
+        assert_eq(st_m, 200, "mismatched If-None-Match 200")
 
-        st_imm, hdrs_imm, css_v7 = http_req("/static/sky-ribbon.css?v=7")
+        # Dynamic pages: content-hash weak ETag + no-cache + 304 revalidation
+        for dyn in ("/", "/post/welcome-to-asmblog/", "/archive/", "/rss.xml", "/sitemap.xml", "/search-index.json"):
+            st_d, hd, bd = http_req(dyn)
+            assert_eq(st_d, 200, f"GET {dyn}")
+            dtag = hd.get("ETag", "")
+            assert dtag.startswith('W/"') and len(dtag) == 20, f"bad dynamic ETag on {dyn}: {dtag!r}"
+            assert "no-cache" in hd.get("Cache-Control", ""), f"dynamic page must be no-cache: {hd}"
+            st_d2, hd2, _ = http_req(dyn)
+            assert_eq(hd2.get("ETag"), dtag, f"ETag must be stable for {dyn}")
+            st_d3, hd3, bd3 = http_req(dyn, headers={"If-None-Match": dtag})
+            assert_eq(st_d3, 304, f"dynamic 304 {dyn}")
+            assert_eq(bd3, b"", f"dynamic 304 body {dyn}")
+            assert hd3.get("ETag") == dtag and "Content-Type" not in hd3, f"bad 304 headers {dyn}: {hd3}"
+            st_h, _, bh = http_req(dyn, method="HEAD", headers={"If-None-Match": dtag})
+            assert_eq(st_h, 304, f"HEAD dynamic 304 {dyn}")
+        _, hd_a, _ = http_req("/")
+        _, hd_b, _ = http_req("/archive/")
+        assert hd_a["ETag"] != hd_b["ETag"], "different pages must have different ETags"
+        _, hz_h, _ = http_req("/healthz")
+        assert "ETag" not in hz_h and "no-store" in hz_h.get("Cache-Control", ""), f"healthz must not be cached: {hz_h}"
+        st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
+        assert_eq(st_404, 404, "404 must ignore If-None-Match")
+
+        st_imm, hdrs_imm, css_v8 = http_req("/static/sky-ribbon.css?v=8")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v7)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v8)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
         assert b"hover: hover" in css_rules and b".lightbox" in css_rules and b".pjax-loader" in css_rules
 
-        st_js, _, js_v7 = http_req("/static/sky-ribbon.js?v=7")
+        st_js, _, js_v8 = http_req("/static/sky-ribbon.js?v=8")
         assert_eq(st_js, 200, "versioned static js 200")
-        assert b"img-lightbox" in js_v7 and b"ring-progress" in js_v7 and b"pjax-loader" in js_v7
+        assert b"img-lightbox" in js_v8 and b"ring-progress" in js_v8 and b"pjax-loader" in js_v8
 
         # 4. 404 & 405 Read-Only Enforcement
         st, _, _ = http_req("/does-not-exist")
@@ -620,7 +650,7 @@ def test_server():
         # 9. Concurrency & Memory/FD Leak Benchmark (20 threads x 100 req = 2000 reqs)
         rss_before = read_rss_kb(proc.pid)
         fd_before = count_fds(proc.pid)
-        bench_paths = ["/", "/post/welcome-to-asmblog/", "/static/style.css", "/search-index.json"]
+        bench_paths = ["/", "/post/welcome-to-asmblog/", "/static/sky-ribbon.css", "/search-index.json"]
 
         def worker(tid):
             ok = 0

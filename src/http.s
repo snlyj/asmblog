@@ -629,6 +629,91 @@ http_send_error:
     pop r12
     ret
 
+# http_inm_match(rdi=&req, rsi=etag_ptr, rdx=etag_len) -> rax=1 if If-None-Match matches
+# RFC 9110 §13.1.2 weak comparison: optional `W/` prefix is ignored on both sides,
+# supports `*` and comma-separated lists of entity-tags.
+.globl http_inm_match
+http_inm_match:
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, [rdi + REQ_ETAG_PTR]
+    mov r13, [rdi + REQ_ETAG_LEN]
+    test r12, r12
+    jz .Linm_no
+    mov r14, rsi
+    mov r15, rdx
+    # strip our own weak prefix
+    cmp r15, 2
+    jb .Linm_scan
+    cmp word ptr [r14], 0x2f57          # "W/"
+    jne .Linm_scan
+    add r14, 2
+    sub r15, 2
+.Linm_scan:
+    xor ebx, ebx                        # cursor
+.Linm_skip:
+    cmp rbx, r13
+    jae .Linm_no
+    movzx eax, byte ptr [r12 + rbx]
+    cmp al, ' '
+    je .Linm_adv
+    cmp al, 9
+    je .Linm_adv
+    cmp al, ','
+    je .Linm_adv
+    cmp al, '*'
+    je .Linm_yes
+    jmp .Linm_item
+.Linm_adv:
+    inc rbx
+    jmp .Linm_skip
+.Linm_item:
+    lea rax, [rbx + 2]
+    cmp rax, r13
+    ja .Linm_item_start
+    cmp word ptr [r12 + rbx], 0x2f57    # client weak prefix "W/"
+    jne .Linm_item_start
+    add rbx, 2
+.Linm_item_start:
+    mov rcx, rbx                        # item start
+.Linm_item_end:
+    cmp rbx, r13
+    jae .Linm_cmp
+    movzx eax, byte ptr [r12 + rbx]
+    cmp al, ','
+    je .Linm_cmp
+    cmp al, ' '
+    je .Linm_cmp
+    cmp al, 9
+    je .Linm_cmp
+    inc rbx
+    jmp .Linm_item_end
+.Linm_cmp:
+    lea rdi, [r12 + rcx]
+    mov rsi, rbx
+    sub rsi, rcx
+    mov rdx, r14
+    mov rcx, r15
+    call xslice_eq
+    test eax, eax
+    jnz .Linm_yes
+    jmp .Linm_skip
+.Linm_yes:
+    mov eax, 1
+    jmp .Linm_ret
+.Linm_no:
+    xor eax, eax
+.Linm_ret:
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
 # http_cookie_get(rdi=&req, rsi=name_ptr, rdx=name_len) -> rax=val_ptr (0 if missing), rdx=val_len
 .globl http_cookie_get
 http_cookie_get:

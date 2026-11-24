@@ -220,26 +220,111 @@ hz_8:            .ascii "}\n"
 fallback_404:    .ascii "<!doctype html><meta charset=\"utf-8\"><title>404 Not Found</title><h1>404 Not Found</h1><p><a href=\"/\">Back to Home</a></p>"
 .equ fallback_404_len, . - fallback_404
 
+dyn_etag_pre:    .ascii "\r\nCache-Control: no-cache\r\nETag: W/\""
+.equ dyn_etag_pre_len, . - dyn_etag_pre
+hex_lc:          .ascii "0123456789abcdef"
+hdr_no_store:    .asciz "\r\nCache-Control: no-store"
+
+.section .bss
+dyn_etag_buf:    .skip 96
+
 .section .text
 
 # --- Safe HTTP Response Dispatch Helpers (zero register-clobber risk) ---
 
-# send_html_200(rdi=conn, rsi=body_ptr, rdx=body_len)
+# send_html_200(rdi=conn, rsi=body_ptr, rdx=body_len)  (content-hashed ETag + 304)
 send_html_200:
-    mov r8, rdx
-    mov rcx, rsi
-    lea rsi, [rip + st_200]
-    lea rdx, [rip + ct_html]
-    xor r9d, r9d
-    jmp http_send_resp
+    lea rcx, [rip + ct_html]
+    jmp send_200_ct
 
 # send_200_ct(rdi=conn, rsi=body_ptr, rdx=body_len, rcx=ctype_cstr)
+# Dynamic pages get a weak content-hash ETag (FNV-1a 64) with `Cache-Control: no-cache`,
+# so revisits / PJAX re-fetches revalidate with a tiny 304 instead of re-downloading.
+# The hash is over the exact rendered bytes, so it is always correct after hot reloads,
+# config edits and restarts.
 send_200_ct:
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi
+    mov r13, rsi
+    mov r14, rdx
+    mov rbx, rcx
+
+    # FNV-1a 64-bit over body
+    movabs rax, 0xcbf29ce484222325
+    movabs r8, 0x100000001b3
+    xor ecx, ecx
+.Ls2_hash:
+    cmp rcx, r14
+    jae .Ls2_hashed
+    movzx edx, byte ptr [r13 + rcx]
+    xor rax, rdx
+    imul rax, r8
+    inc rcx
+    jmp .Ls2_hash
+.Ls2_hashed:
+    # "\r\nCache-Control: no-cache\r\nETag: W/\"" + 16 hex + "\""
+    lea rdi, [rip + dyn_etag_buf]
+    lea rsi, [rip + dyn_etag_pre]
+    mov ecx, dyn_etag_pre_len
+    rep movsb
+    lea r15, [rdi - 3]                  # points at W/" (ETag value start)
+    lea r9, [rip + hex_lc]
+    mov ecx, 16
+.Ls2_hex:
+    rol rax, 4
+    mov edx, eax
+    and edx, 15
+    movzx edx, byte ptr [r9 + rdx]
+    mov [rdi], dl
+    inc rdi
+    dec ecx
+    jnz .Ls2_hex
+    mov byte ptr [rdi], '"'
+    mov byte ptr [rdi + 1], 0
+    lea rdx, [rdi + 1]
+    sub rdx, r15                        # ETag value length
+
+    lea rdi, [rip + cur_req]
+    mov rsi, r15
+    call http_inm_match
+    test eax, eax
+    jnz .Ls2_304
+
+    mov rdi, r12
+    lea rsi, [rip + st_200]
+    mov rdx, rbx
+    mov rcx, r13
+    mov r8, r14
+    lea r9, [rip + dyn_etag_buf]
+    call http_send_resp
+    jmp .Ls2_ret
+.Ls2_304:
+    mov rdi, r12
+    lea rsi, [rip + st_304]
+    xor edx, edx
+    xor ecx, ecx
+    xor r8d, r8d
+    lea r9, [rip + dyn_etag_buf]
+    call http_send_resp
+.Ls2_ret:
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
+# send_200_ct_nocache(rdi=conn, rsi=body_ptr, rdx=body_len, rcx=ctype_cstr)  (no ETag, e.g. /healthz)
+send_200_ct_nocache:
     mov r8, rdx
     mov rdx, rcx
     mov rcx, rsi
     lea rsi, [rip + st_200]
-    xor r9d, r9d
+    lea r9, [rip + hdr_no_store]
     jmp http_send_resp
 
 # --- Template Context Helpers ---
@@ -1499,7 +1584,7 @@ handle_healthz:
     lea rsi, [rip + g_render_page]
     mov rdx, [rsp + SB_LEN]
     lea rcx, [rip + ct_json]
-    call send_200_ct
+    call send_200_ct_nocache
     add rsp, 32
     pop r12
     ret

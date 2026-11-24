@@ -140,9 +140,13 @@
   /* ---------------------------------------------------------
      4. Silky Circular-Ripple Day/Night Theme Toggle
      --------------------------------------------------------- */
+  function store(key, val) {
+    try { localStorage.setItem(key, val); } catch (_) { /* storage disabled: keep in-memory state only */ }
+  }
+
   function applyTheme(next) {
     root.setAttribute('data-theme', next);
-    localStorage.setItem('jiehua-theme', next);
+    store('asmblog-theme', next);
   }
 
   if (themeBtn) {
@@ -193,10 +197,10 @@
       var off = root.getAttribute('data-fx') === 'off';
       if (off) {
         root.removeAttribute('data-fx');
-        localStorage.setItem('jiehua-fx', 'on');
+        store('asmblog-fx', 'on');
       } else {
         root.setAttribute('data-fx', 'off');
-        localStorage.setItem('jiehua-fx', 'off');
+        store('asmblog-fx', 'off');
       }
     });
   }
@@ -558,15 +562,18 @@
     if (url.pathname.indexOf('/static/') === 0) return false;
     if (url.pathname.indexOf('/uploads/') === 0) return false;
     if (url.pathname.indexOf('/api/') === 0) return false;
-    if (url.pathname === '/studio' || url.pathname === '/studio/') return false;
     if (/\.(xml|json|ico|png|jpg|jpeg|webp|gif|svg|css|js|pdf|zip)$/i.test(url.pathname)) return false;
     return true;
   }
 
+  var PREFETCH_TTL = 30000;
+  var PREFETCH_MAX = 24;
+
   function fetchHtml(urlStr) {
     var now = Date.now();
     var cached = prefetchCache.get(urlStr);
-    if (cached && now - cached.ts < 30000) return cached.promise;
+    if (cached && now - cached.ts < PREFETCH_TTL) return cached.promise;
+    if (cached) prefetchCache.delete(urlStr);
     var p = fetch(urlStr, { headers: { 'X-AsmBlog-PJAX': '1' } })
       .then(function (resp) {
         if (!resp.ok && resp.status !== 404) throw new Error('HTTP ' + resp.status);
@@ -574,7 +581,16 @@
         if (ct.indexOf('text/html') === -1) throw new Error('Not HTML');
         return resp.text();
       });
+    // A failed (pre)fetch must never poison later navigations: evict it right away.
+    p.catch(function () {
+      var cur = prefetchCache.get(urlStr);
+      if (cur && cur.promise === p) prefetchCache.delete(urlStr);
+    });
     prefetchCache.set(urlStr, { ts: now, promise: p });
+    // Bounded LRU-ish eviction (Map keeps insertion order -> oldest first).
+    while (prefetchCache.size > PREFETCH_MAX) {
+      prefetchCache.delete(prefetchCache.keys().next().value);
+    }
     return p;
   }
 

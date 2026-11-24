@@ -21,6 +21,7 @@ g_active_conns:  .quad 0
 epoll_events:    .skip 64 * 12       # 64 packed struct epoll_event (12 bytes each!)
 sig_read_buf:    .skip 128
 inotify_buf:     .skip 4096
+.globl cur_req
 cur_req:         .skip REQ_SIZE
 inotify_th_path: .skip 256
 

@@ -8,7 +8,8 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon-ribbon.svg?v=2">
   <script>
     (function(){
-      var t = localStorage.getItem('jiehua-theme');
+      var t = null;
+      try { t = localStorage.getItem('asmblog-theme'); } catch (_) {}
       if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
       document.documentElement.setAttribute('data-theme', t || 'light');
     })();

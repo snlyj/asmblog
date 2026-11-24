@@ -272,16 +272,15 @@ serve_file_common:
     xor esi, esi
     call sb_byte
 
-    # Compare If-None-Match against quoted ETag
+    # Compare If-None-Match against quoted ETag (RFC 9110 weak comparison)
     cmp qword ptr [r13 + REQ_ETAG_PTR], 0
     je .Lst_send_file
-    mov rsi, [rsp + 48 + SB_LEN]
-    dec rsi
-    sub rsi, rbx
-    lea rdi, [rsp + 1048 + rbx]
-    mov rdx, [r13 + REQ_ETAG_PTR]
-    mov rcx, [r13 + REQ_ETAG_LEN]
-    call xslice_eq
+    mov rdx, [rsp + 48 + SB_LEN]
+    dec rdx
+    sub rdx, rbx
+    lea rsi, [rsp + 1048 + rbx]
+    mov rdi, r13
+    call http_inm_match
     test eax, eax
     jz .Lst_send_file
 
