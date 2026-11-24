@@ -1,4 +1,4 @@
-<div class="feed-wrap">
+<div class="feed-wrap feed-wide">
   <section class="page-head-card reveal">
     <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
     <span class="candy-badge candy-pink">✦ CATEGORY</span>
@@ -13,28 +13,30 @@
     {{/categories}}
   </nav>
 
-  <section class="post-list">
+  <section class="post-list post-grid">
     {{#posts}}
-    <article class="post-card reveal">
-      <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+    <article class="post-card reveal{{#cover}} has-cover{{/cover}}">
+      {{^cover}}<div class="ribbon-corner" aria-hidden="true"><span>★</span></div>{{/cover}}
       {{#cover}}
       <a class="post-cover-link" href="/post/{{ slug }}/">
         <img class="post-cover" src="{{ cover }}" alt="{{ title }}" loading="lazy" decoding="async">
       </a>
       {{/cover}}
-      <div class="post-meta">
-        {{#category}}<a class="cat-badge" href="/category/{{ category }}/">✦ {{ category }}</a>{{/category}}
-        <time>{{ date }}</time>
-        <span class="meta-dot">✦</span>
-        <span>约 {{ read_min }} 分钟阅读</span>
-      </div>
-      <h2 class="post-card-title">
-        <a href="/post/{{ slug }}/">{{ title }}</a>
-      </h2>
-      <p class="post-summary">{{ summary }}</p>
-      <div class="post-card-foot">
-        <div class="tag-row">{{{ tags_html }}}</div>
-        <a class="read-more" href="/post/{{ slug }}/">阅读全文 <span aria-hidden="true">&rarr;</span></a>
+      <div class="post-body">
+        <div class="post-meta">
+          {{#category}}<a class="cat-badge" href="/category/{{ category }}/">✦ {{ category }}</a>{{/category}}
+          <time>{{ date }}</time>
+          <span class="meta-dot">✦</span>
+          <span>约 {{ read_min }} 分钟阅读</span>
+        </div>
+        <h2 class="post-card-title">
+          <a href="/post/{{ slug }}/">{{ title }}</a>
+        </h2>
+        <p class="post-summary">{{ summary }}</p>
+        <div class="post-card-foot">
+          <div class="tag-row">{{{ tags_html }}}</div>
+          <a class="read-more" href="/post/{{ slug }}/">阅读全文 <span aria-hidden="true">&rarr;</span></a>
+        </div>
       </div>
     </article>
     {{/posts}}

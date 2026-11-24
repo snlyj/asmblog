@@ -302,17 +302,24 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v8 = http_req("/static/sky-ribbon.css?v=8")
+        st_imm, hdrs_imm, css_v9 = http_req("/static/sky-ribbon.css?v=9")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v8)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v9)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
-        assert b"hover: hover" in css_rules and b".lightbox" in css_rules and b".pjax-loader" in css_rules
+        for required_css in (b"hover: hover", b".lightbox", b".pjax-loader", b".post-grid", b".toc-desktop", b".toc-mobile", b".sky-toast", b".search-hl", b".archive-year"):
+            assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v8 = http_req("/static/sky-ribbon.js?v=8")
+        st_js, _, js_v9 = http_req("/static/sky-ribbon.js?v=9")
         assert_eq(st_js, 200, "versioned static js 200")
-        assert b"img-lightbox" in js_v8 and b"ring-progress" in js_v8 and b"pjax-loader" in js_v8
+        for required_js in (b"img-lightbox", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"setLightboxZoom", b"showToast", b"highlightText"):
+            assert required_js in js_v9, f"missing expected UI JS feature: {required_js!r}"
+
+        st_post, _, post_html = http_req("/post/welcome-to-asmblog/")
+        assert_eq(st_post, 200, "GET /post/welcome-to-asmblog/")
+        post_txt = post_html.decode("utf-8")
+        assert "article-toc-slot" in post_txt and "share-post-btn" in post_txt, "article TOC/share hooks missing"
 
         # 4. 404 & 405 Read-Only Enforcement
         st, _, _ = http_req("/does-not-exist")

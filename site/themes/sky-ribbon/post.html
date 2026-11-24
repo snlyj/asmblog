@@ -23,27 +23,20 @@
     </figure>
     {{/cover}}
 
+    <div id="article-toc-slot"></div>
+
     <div class="prose">
       {{{ content_html }}}
     </div>
+
+    <footer class="article-foot">
+      <span class="article-sign">✦ 本文由 <strong>{{ author }}</strong> 发布于 {{ date }}</span>
+      <button id="share-post-btn" class="share-btn" type="button">🔗 复制链接</button>
+    </footer>
   </article>
 
   <nav class="post-nav reveal" aria-label="Adjacent Posts">
-    <div class="post-nav-slot">
-      {{#prev_slug}}
-      <a class="post-nav-card" href="/post/{{ prev_slug }}/">
-        <span class="post-nav-label">&larr; 上一篇</span>
-        <span class="post-nav-title">{{ prev_title }}</span>
-      </a>
-      {{/prev_slug}}
-    </div>
-    <div class="post-nav-slot">
-      {{#next_slug}}
-      <a class="post-nav-card post-nav-right" href="/post/{{ next_slug }}/">
-        <span class="post-nav-label">下一篇 &rarr;</span>
-        <span class="post-nav-title">{{ next_title }}</span>
-      </a>
-      {{/next_slug}}
-    </div>
+    <div class="post-nav-slot">{{#prev_slug}}<a class="post-nav-card" href="/post/{{ prev_slug }}/"><span class="post-nav-label">&larr; 上一篇</span><span class="post-nav-title">{{ prev_title }}</span></a>{{/prev_slug}}</div>
+    <div class="post-nav-slot">{{#next_slug}}<a class="post-nav-card post-nav-right" href="/post/{{ next_slug }}/"><span class="post-nav-label">下一篇 &rarr;</span><span class="post-nav-title">{{ next_title }}</span></a>{{/next_slug}}</div>
   </nav>
 </div>
