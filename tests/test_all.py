@@ -306,19 +306,19 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v11 = http_req("/static/sky-ribbon.css?v=11")
+        st_imm, hdrs_imm, css_v12 = http_req("/static/sky-ribbon.css?v=12")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v11)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v12)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
         for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".pjax-loader", b".post-grid", b".toc-desktop", b".toc-mobile", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
             assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v11 = http_req("/static/sky-ribbon.js?v=11")
+        st_js, _, js_v12 = http_req("/static/sky-ribbon.js?v=12")
         assert_eq(st_js, 200, "versioned static js 200")
         for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText"):
-            assert required_js in js_v11, f"missing expected UI JS feature: {required_js!r}"
+            assert required_js in js_v12, f"missing expected UI JS feature: {required_js!r}"
 
         # Open Graph / Twitter Card social preview meta + zero-bloat Giscus hidden by default
         assert 'property="og:type" content="website"' in home_txt

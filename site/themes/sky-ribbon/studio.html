@@ -1232,6 +1232,7 @@
       crop.objUrl = '';
     }
     crop.rawFile = null;
+    crop.sourceOrigUrl = '';
     cropImg.removeAttribute('src');
   }
 
@@ -1242,6 +1243,7 @@
       crop.objUrl = '';
     }
     crop.rawFile = rawFile || null;
+    crop.sourceOrigUrl = (typeof source === 'string') ? (extractOrigUrl(source) || source) : '';
     crop.aspect = opts.aspect || (16 / 9);
     crop.maxW = opts.maxW || 1600;
     crop.previewW = opts.previewW || 1080;
@@ -1397,27 +1399,49 @@
     var sw = Math.min(crop.natW - sx, crop.stageW / scale);
     var sh = Math.min(crop.natH - sy, crop.stageH / scale);
 
-    var outW = Math.min(crop.maxW, Math.max(512, Math.round(sw)));
-    var outH = Math.round(outW / crop.aspect);
-    var prevW = Math.min(crop.previewW || 1080, outW);
+    var prevW = Math.min(crop.previewW || 1080, Math.max(Math.abs(crop.aspect - 1) < 0.05 ? 256 : 512, Math.round(sw)));
     var prevH = Math.round(prevW / crop.aspect);
+    var prevQ = Math.abs(crop.aspect - 1) < 0.05 ? 0.86 : 0.82;
     try {
-      var origCanvas = renderScaledCanvas(cropImg, sx, sy, sw, sh, outW, outH);
-      var prevCanvas = (prevW < outW) ? renderScaledCanvas(cropImg, sx, sy, sw, sh, prevW, prevH) : origCanvas;
-      var origP = canvasToBlob(origCanvas, 'image/jpeg', 0.93).then(function (b) {
-        if (b && b.size > MAX_UPLOAD_BYTES) return canvasToBlob(origCanvas, 'image/jpeg', 0.82);
-        return b;
+      // 1) Cropped lightweight WebP preview (for card/banner framing & fast loading)
+      var prevCanvas = renderScaledCanvas(cropImg, sx, sy, sw, sh, prevW, prevH);
+      var prevUrlP = encodePreviewBlob(prevCanvas, prevQ).then(function (b) {
+        if (!b) throw new Error('图片裁剪失败，请重试');
+        return uploadRawBlob(b);
       });
-      var prevQ = Math.abs(crop.aspect - 1) < 0.05 ? 0.86 : 0.82;
-      var prevP = encodePreviewBlob(prevCanvas, prevQ);
-      Promise.all([prevP, origP])
-        .then(function (pair) {
-          if (!pair[0] && !pair[1]) throw new Error('图片裁剪失败，请重试');
-          return uploadDualPair(pair[0], pair[1]);
-        })
-        .then(function (url) {
+
+      // 2) Full UNCROPPED original image (loaded when reader clicks to view full image, or when re-cropping!)
+      var origUrlP;
+      var rawFile = crop.rawFile;
+      if (rawFile) {
+        var directOk = rawFile.size <= MAX_UPLOAD_BYTES &&
+          (rawFile.type === 'image/jpeg' || rawFile.type === 'image/png' || rawFile.type === 'image/webp' || rawFile.type === 'image/gif');
+        if (directOk) {
+          origUrlP = uploadRawBlob(rawFile);
+        } else {
+          var ow = Math.min(2400, crop.natW);
+          var oh = Math.round(crop.natH * (ow / crop.natW));
+          var fullCanvas = renderScaledCanvas(cropImg, 0, 0, crop.natW, crop.natH, ow, oh);
+          origUrlP = canvasToBlob(fullCanvas, 'image/jpeg', 0.92).then(function (b) {
+            if (b && b.size > MAX_UPLOAD_BYTES) return canvasToBlob(fullCanvas, 'image/jpeg', 0.80);
+            return b;
+          }).then(function (b) {
+            if (!b) throw new Error('原图处理失败，请重试');
+            return uploadRawBlob(b);
+          });
+        }
+      } else if (crop.sourceOrigUrl) {
+        // Re-cropping an already uploaded original: keep the existing uncropped original URL untouched!
+        origUrlP = Promise.resolve(crop.sourceOrigUrl);
+      } else {
+        origUrlP = Promise.resolve('');
+      }
+
+      Promise.all([prevUrlP, origUrlP])
+        .then(function (urls) {
+          var finalUrl = urls[1] ? (urls[0] + '?orig=' + urls[1]) : urls[0];
           closeCropper();
-          if (doneCb) doneCb(url);
+          if (doneCb) doneCb(finalUrl);
         })
         .catch(function (err) {
           cropConfirmBtn.disabled = false;

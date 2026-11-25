@@ -481,18 +481,18 @@
     if (targetOrig && targetOrig !== item.src) {
       if (loadedOrigs.has(targetOrig)) {
         lb.img.src = targetOrig;
-        setLightboxBadge('✦ 已加载高清原图', true);
+        setLightboxBadge('✦ 完整高清原图', true);
       } else {
-        // Show cached fast preview instantly, then upgrade seamlessly to full-quality original
+        // Show cached fast preview instantly, then upgrade seamlessly to full uncropped original
         lb.img.src = item.src;
-        setLightboxBadge('⏳ 加载高清原图中…', false);
+        setLightboxBadge('⏳ 正在加载完整原图…', false);
         var hi = new Image();
         hi.decoding = 'async';
         hi.onload = function () {
           loadedOrigs.add(targetOrig);
           if (lb.loadSeq !== seq) return;
           lb.img.src = targetOrig;
-          setLightboxBadge('✦ 已加载高清原图', true);
+          setLightboxBadge('✦ 完整高清原图', true);
         };
         hi.onerror = function () {
           if (lb.loadSeq !== seq) return;
