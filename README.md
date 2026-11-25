@@ -5,8 +5,8 @@
 <h1 align="center">✦ AsmBlog — Pure x86-64 Assembly Anime Static Blog</h1>
 
 <p align="center">
-  <strong>65 KiB 纯 x86-64 手写汇编零 <code>libc</code> 博客引擎 × 60/120fps 丝滑二次元「晴空星梦丝带」前端主题</strong><br/>
-  <em>A ~65 KiB zero-libc Linux x86-64 assembly static blog engine &amp; SSG paired with a silky anime theme and a hidden Author Studio.</em>
+  <strong>~69 KiB 纯 x86-64 手写汇编零 <code>libc</code> 博客引擎 × 60/120fps 丝滑二次元「晴空星梦丝带」前端主题</strong><br/>
+  <em>A ~69 KiB zero-libc Linux x86-64 assembly static blog engine &amp; SSG paired with a silky anime theme, video streaming, and a hidden Author Studio.</em>
 </p>
 
 <p align="center">
@@ -15,21 +15,21 @@
   <a href="https://github.com/snlyj/asmblog/releases"><img src="https://img.shields.io/github/v/release/snlyj/asmblog?style=flat-square&color=5cb8ff" alt="Release"></a>
   <img src="https://img.shields.io/badge/Arch-Linux%20x86__64-5cb8ff?style=flat-square" alt="Linux x86_64">
   <img src="https://img.shields.io/badge/libc-ZERO-ff94c2?style=flat-square" alt="Zero libc">
-  <img src="https://img.shields.io/badge/Binary-~65%20KiB-b9a4ff?style=flat-square" alt="Binary Size">
+  <img src="https://img.shields.io/badge/Binary-~69%20KiB-b9a4ff?style=flat-square" alt="Binary Size">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-ffd86b?style=flat-square" alt="MIT License"></a>
 </p>
 
 > [!TIP]
 > **🌐 在线体验 / Live Demo**：👉 **[https://jiehua.13-58-183-35.sslip.io/](https://jiehua.13-58-183-35.sslip.io/)**
-> 实际运行于纯 x86-64 `asmblog`（65 KiB 单文件）+ Caddy 自动 HTTPS（HTTP/2 & HTTP/3），欢迎直接打开体验零白屏 PJAX 切页、圆形水波纹昼夜模式、高清插画灯箱、桌面/手机双端 60/120fps 顺滑度与站内极速搜索。
+> 实际运行于纯 x86-64 `asmblog`（~69 KiB 单文件）+ Caddy 自动 HTTPS（HTTP/2 & HTTP/3），欢迎直接打开体验零白屏 PJAX 切页、双层 WebP/原图插画灯箱、在线视频流式播放、圆形水波纹昼夜模式、桌面/手机双端 60/120fps 顺滑度与站内极速搜索。
 
 ---
 
 ## ✨ 项目简介 (Overview)
 
-**AsmBlog** 是一个为个人写作与二次元同好打造的**纯 x86-64 Linux 汇编静态博客框架**——整个服务端、Markdown 解析器、模板引擎、静态站生成器（SSG）、SHA-256 认证与隐藏写作后台全部由手写 Intel 语法汇编构建，直接调用 Linux `syscall`，**不依赖 `glibc`、不依赖任何第三方库、不需要数据库**。
+**AsmBlog** 是一个为个人写作与二次元同好打造的**纯 x86-64 Linux 汇编静态博客框架**——整个服务端、Markdown 解析器、模板引擎、静态站生成器（SSG）、HTTP 206 视频流服务、SHA-256 认证与隐藏写作后台全部由手写 Intel 语法汇编构建，直接调用 Linux `syscall`，**不依赖 `glibc`、不依赖任何第三方库、不需要数据库**。
 
-- **硬核到极致的内核**：静态链接剥离后仅 **65 KiB**，单线程 `epoll` + 零拷贝 `sendfile` + `inotify` 热重载，空闲内存 **`300 KiB`**，20 并发压测 **`2,100–2,400+ req/s`**，压测后内存 `< 0.4 MiB`，文件句柄零泄漏；支持 **`FROM scratch`** 极简 Docker 镜像。
+- **硬核到极致的内核**：静态链接剥离后仅 **~69 KiB**，单线程 `epoll` + 零拷贝 `sendfile`（支持 HTTP `Range` / `206` 视频拖拽播放与 256 KiB 公平分片防阻塞）+ `inotify` 热重载，空闲内存 **`300 KiB`**，20 并发压测 **`2,100–2,400+ req/s`**，文件句柄零泄漏；支持 **`FROM scratch`** 极简 Docker 镜像。
 - **软萌到极致的前端**：内置二次元少女风主题 **「晴空星梦丝带 (Sky Ribbon)」**，附带原创晴空插画头图、蝴蝶结头像与 404 萌图，严格杜绝 `backdrop-filter` / `filter: blur` / `100dvh` 滚动卡顿，在手机和桌面端都能保持 60/120fps 顺滑体验。
 
 ---
@@ -66,7 +66,7 @@
 
 | 指标 | AsmBlog（实测值） | 传统动态博客 (PHP/Node/Python) |
 | :--- | :--- | :--- |
-| 静态可执行文件体积 | **`65 KiB`**（零动态库依赖） | 30 MB – 200+ MB |
+| 静态可执行文件体积 | **`~69 KiB`**（零动态库依赖） | 30 MB – 200+ MB |
 | 服务端内存占用 (`VmRSS`) | 空闲 **`300 KiB`** / 压测后 **`392 KiB`** | 80 MB – 500+ MB |
 | 20 并发吞吐量（2,000 请求） | **`2,131 – 2,444 req/s`**（`2000/2000 OK`） | 100 – 800 req/s |
 | HTTPS 压缩后首屏代码体积 | HTML **`3.2 KB`** + CSS **`10.1 KB`** + JS **`7.8 KB`** ≈ **`21 KB`** | 300 KB – 2+ MB |
@@ -83,7 +83,7 @@
 git clone https://github.com/snlyj/asmblog.git
 cd asmblog
 
-# 从 GitHub Releases 下载仅 65 KiB 的 Linux x86_64 静态二进制
+# 从 GitHub Releases 下载仅 ~69 KiB 的 Linux x86_64 静态二进制
 curl -fsSL -o asmblog https://github.com/snlyj/asmblog/releases/latest/download/asmblog-linux-x86_64
 chmod +x asmblog
 
@@ -201,16 +201,16 @@ draft: false
 | `syscall.s` | Linux x86-64 系统调用薄封装与原子文件替换 (`write_file_atomic`) |
 | `mem.s` | 16 MiB `mmap` Bump Arena 分配器、有界缓冲区 `sbuf_t`、HTML/JSON/URL 编解码 |
 | `config.s` | `config.ini` 解析与 URL / 路径安全校验 |
-| `markdown.s` | Front-Matter 解析与流式 Markdown→HTML 渲染器（含自动 XSS 清洗） |
+| `markdown.s` | Front-Matter 解析与流式 Markdown→HTML 渲染器（自动 XSS 清洗 + HTML5 `<video>` 视频渲染） |
 | `template.s` | 轻量 Mustache 风格模板引擎（变量转义、原样输出、条件块、循环与 Partial） |
 | `store.s` | 内存文章 / 标签 / 分类 / 模板索引与 `inotify` 无停机热重载 |
-| `http.s` | HTTP/1.1 增量解析、RFC 8259 JSON 解码（含 `\uXXXX` 代理对）、Cookie & `X-Forwarded-Proto` |
+| `http.s` | HTTP/1.1 增量解析、RFC 8259 JSON 解码（含 `\uXXXX` 代理对）、RFC 9110 弱 ETag、`Range` & Cookie |
 | `router.s` | 声明式路由表与动态 `studio_path` 匹配 |
-| `handlers.s` | 首页、分页、文章、归档、标签、分类、搜索索引、RSS、Sitemap 渲染（HTTP/SSG 复用） |
-| `static.s` | `/static/*` 与 `/uploads/*` 零拷贝 `sendfile`、强 `ETag`/`304` 与智能缓存头 |
+| `handlers.s` | 首页、分页、文章、归档、标签、分类、搜索索引、RSS、Sitemap、OG 大卡片与动态弱 ETag/304 |
+| `static.s` | `/static/*` 与 `/uploads/*` 零拷贝 `sendfile`、HTTP `Range`/`206` 视频流式传输、强 `ETag`/`304` 与隐藏文件拦截 |
 | `sha256.s` | 纯 x86-64 FIPS 180-4 SHA-256 与常量时间内存比较 `ct_memeq` |
-| `studio.s` | 隐藏作者后台：随机 256-bit 会话表、429 防爆破、文章/分类/外观 CRUD、魔数图片上传 |
-| `net_epoll.s` | 非阻塞单线程 `epoll` 事件循环、`TCP_NODELAY`、迭代式 Pipeline、优雅 `SIGTERM` 退出 |
+| `studio.s` | 隐藏作者后台：随机 256-bit 会话表、429 防爆破、文章/分类/外观/Giscus CRUD、魔数图片与 100MB 分片视频上传 |
+| `net_epoll.s` | 非阻塞单线程 `epoll` 事件循环、`TCP_NODELAY`、256 KiB 公平 `sendfile` 分片流式发送、优雅 `SIGTERM` 退出 |
 
 ---
 

@@ -150,10 +150,13 @@ epoll_mod_conn:
     ret
 
 # conn_try_write(rdi=&conn) -> writes tx_buf and sendfile non-blocking
+# Caps sendfile to 256 KiB per epoll tick for multi-user fairness and refreshes
+# CONN_LAST_ACTIVE on forward progress so long video streams never idle-timeout.
 conn_try_write:
     push rbx
     push r12
     mov r12, rdi
+    xor ebx, ebx                          # made_progress flag
 .Lctw_buf:
     mov rdx, [r12 + CONN_TX_LEN]
     mov rcx, [r12 + CONN_TX_OFF]
@@ -169,6 +172,7 @@ conn_try_write:
     je .Lctw_want_out
     test rax, rax
     jle .Lctw_err
+    mov ebx, 1
     add [r12 + CONN_TX_OFF], rax
     jmp .Lctw_buf
 
@@ -179,6 +183,11 @@ conn_try_write:
     mov rcx, [r12 + CONN_FILE_REM]
     test rcx, rcx
     jz .Lctw_close_file
+    # Fair burst cap (256 KiB per epoll tick) so large video streams never starve other clients
+    cmp rcx, 262144
+    jbe .Lctw_sf_go
+    mov ecx, 262144
+.Lctw_sf_go:
     mov rdi, [r12 + CONN_FD]
     mov rsi, rax
     lea rdx, [r12 + CONN_FILE_OFF]
@@ -189,8 +198,10 @@ conn_try_write:
     je .Lctw_want_out
     test rax, rax
     jle .Lctw_err
+    mov ebx, 1
     sub [r12 + CONN_FILE_REM], rax
-    jmp .Lctw_file
+    cmp qword ptr [r12 + CONN_FILE_REM], 0
+    jne .Lctw_want_out
 
 .Lctw_close_file:
     mov rdi, [r12 + CONN_FILE_FD]
@@ -225,6 +236,11 @@ conn_try_write:
     ret
 
 .Lctw_want_out:
+    test ebx, ebx
+    jz .Lctw_arm_out
+    call mono_sec
+    mov [r12 + CONN_LAST_ACTIVE], rax
+.Lctw_arm_out:
     mov rdi, r12
     mov esi, EPOLLOUT | EPOLLRDHUP
     call epoll_mod_conn

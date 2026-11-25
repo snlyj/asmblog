@@ -788,6 +788,8 @@ is_safe_relpath:
     ja .Lsr_no
     cmp byte ptr [rdi], '/'
     je .Lsr_no
+    cmp byte ptr [rdi], '.'
+    je .Lsr_no
     xor ecx, ecx
 .Lsr_loop:
     cmp rcx, rsi
@@ -799,6 +801,11 @@ is_safe_relpath:
     je .Lsr_no
     cmp al, '.'
     jne .Lsr_next
+    # Block hidden dotfiles (e.g. sub/.part, .gitkeep) and ".." traversal
+    test rcx, rcx
+    jz .Lsr_no
+    cmp byte ptr [rdi + rcx - 1], '/'
+    je .Lsr_no
     lea rdx, [rcx + 1]
     cmp rdx, rsi
     jae .Lsr_next

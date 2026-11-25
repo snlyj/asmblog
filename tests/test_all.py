@@ -349,8 +349,8 @@ def test_server():
             st, _, _ = http_req("/", method=m)
             assert_eq(st, 405, f"{m} / must be 405")
 
-        # 5. Path traversal protection
-        for bad_path in ["/static/../../etc/passwd", "/static/%2e%2e/%2e%2e/etc/passwd"]:
+        # 5. Path traversal & hidden dot-file protection (.gitkeep / .part / ../)
+        for bad_path in ["/static/../../etc/passwd", "/static/%2e%2e/%2e%2e/etc/passwd", "/uploads/.gitkeep", "/uploads/.hidden.mp4.part"]:
             raw = raw_exchange([f"GET {bad_path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n".encode()])
             assert raw.startswith(b"HTTP/1.1 403"), f"expected 403 for {bad_path}, got {raw[:40]!r}"
 

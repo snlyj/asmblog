@@ -9,7 +9,7 @@ COPY src/ ./src/
 
 RUN bash build.sh --strip && ls -lh /src/asmblog
 
-# Stage 2: Ultra-minimal FROM scratch image (~65 KiB binary layer!)
+# Stage 2: Ultra-minimal FROM scratch image (~69 KiB binary layer!)
 FROM scratch
 
 COPY --from=builder /src/asmblog /asmblog
