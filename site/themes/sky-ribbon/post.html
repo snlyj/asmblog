@@ -5,6 +5,11 @@
       <div class="article-crumb">
         <a href="/">&larr; 返回晴空首页</a>
         {{#category}}<a class="cat-badge" href="/category/{{ category }}/">✦ {{ category }}</a>{{/category}}
+        <div class="font-size-ctrl" role="group" aria-label="正文字号调节">
+          <button type="button" class="font-btn" data-font-size="sm" title="紧凑字号">A-</button>
+          <button type="button" class="font-btn" data-font-size="md" title="标准字号">A</button>
+          <button type="button" class="font-btn" data-font-size="lg" title="大字舒适阅读">A+</button>
+        </div>
       </div>
       <div class="post-meta">
         <time>{{ date }}</time>

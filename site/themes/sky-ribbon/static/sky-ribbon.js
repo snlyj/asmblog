@@ -23,10 +23,16 @@
   var maxScroll = 1;
   var scrollTicking = false;
   var backTopShown = false;
+  var fabsShown = false;
   var tocEntries = [];
   var activeTocId = '';
   var toastEl = null;
   var toastTimer = null;
+  var scrollMemo = new Map();
+  var currentUrlKey = window.location.pathname + window.location.search;
+  if ('scrollRestoration' in history) {
+    try { history.scrollRestoration = 'manual'; } catch (_) {}
+  }
 
   function showToast(msg) {
     if (!toastEl) {
@@ -118,6 +124,14 @@
       if (shouldShow !== backTopShown) {
         backTopShown = shouldShow;
         backTop.classList.toggle('is-shown', shouldShow);
+      }
+    }
+    var fabs = document.getElementById('article-fabs');
+    if (fabs) {
+      var showFabs = y > 260;
+      if (showFabs !== fabsShown || fabs.classList.contains('is-shown') !== showFabs) {
+        fabsShown = showFabs;
+        fabs.classList.toggle('is-shown', showFabs);
       }
     }
     syncTocActive(y);
@@ -308,7 +322,7 @@
   document.addEventListener('pointerdown', function (e) {
     if (reducedMotion || root.getAttribute('data-fx') === 'off') return;
     if (e.button !== 0) return;
-    if (e.target && e.target.closest && e.target.closest('#img-lightbox')) return;
+    if (e.target && e.target.closest && e.target.closest('#img-lightbox, #cmd-search, #toc-sheet')) return;
     var count = 5;
     for (var i = 0; i < count; i++) {
       var sp = document.createElement('span');
@@ -353,9 +367,16 @@
   }
 
   /* ---------------------------------------------------------
-     6. Zero-Blur GPU Illustration Lightbox (Click-to-Load HD Original + 2x Zoom)
+     6. Zero-Blur GPU Gallery Lightbox (HD Original + Pan + Pinch + Wheel + Swipe-Down)
      --------------------------------------------------------- */
-  var lb = { el: null, img: null, cap: null, badge: null, orig: null, zoomBtn: null, prev: null, next: null, items: [], idx: 0, touchX: 0, lastTap: 0, zoomed: false, loadSeq: 0 };
+  var lb = {
+    el: null, img: null, cap: null, badge: null, orig: null, zoomBtn: null, prev: null, next: null,
+    items: [], idx: 0, lastTap: 0, zoomed: false, loadSeq: 0,
+    scale: 1, tx: 0, ty: 0, ptrs: new Map(),
+    pinchDist: 0, pinchMidX: 0, pinchMidY: 0,
+    dragAxis: '', startX: 0, startY: 0, startTx: 0, startTy: 0,
+    moved: false, suppressClick: false
+  };
   var loadedOrigs = new Set();
 
   function extractOrigUrl(urlStr) {
@@ -368,24 +389,83 @@
     return '';
   }
 
-  function setLightboxZoom(on, clientX, clientY) {
+  function clampLightboxPan() {
     if (!lb.img) return;
-    lb.zoomed = !!on;
-    if (lb.zoomed && typeof clientX === 'number' && typeof clientY === 'number') {
-      var r = lb.img.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) {
-        var ox = Math.min(85, Math.max(15, ((clientX - r.left) / r.width) * 100));
-        var oy = Math.min(85, Math.max(15, ((clientY - r.top) / r.height) * 100));
-        lb.img.style.transformOrigin = ox.toFixed(1) + '% ' + oy.toFixed(1) + '%';
-      }
-    } else if (!lb.zoomed) {
-      lb.img.style.transformOrigin = 'center center';
+    if (lb.scale <= 1.02) {
+      lb.tx = 0;
+      lb.ty = 0;
+      return;
     }
+    var bw = lb.img.offsetWidth || 0;
+    var bh = lb.img.offsetHeight || 0;
+    var maxX = Math.max(0, (bw * lb.scale - window.innerWidth * 0.92) / 2);
+    var maxY = Math.max(0, (bh * lb.scale - window.innerHeight * 0.86) / 2);
+    if (lb.tx > maxX) lb.tx = maxX;
+    if (lb.tx < -maxX) lb.tx = -maxX;
+    if (lb.ty > maxY) lb.ty = maxY;
+    if (lb.ty < -maxY) lb.ty = -maxY;
+  }
+
+  function applyLightboxTransform(animate) {
+    if (!lb.img) return;
+    lb.zoomed = lb.scale > 1.04;
+    lb.img.classList.toggle('is-anim', !!animate && !reducedMotion);
     lb.img.classList.toggle('is-zoomed', lb.zoomed);
+    lb.img.style.transform =
+      'translate3d(' + lb.tx.toFixed(1) + 'px,' + lb.ty.toFixed(1) + 'px,0) scale(' + lb.scale.toFixed(4) + ')';
     if (lb.zoomBtn) {
       lb.zoomBtn.classList.toggle('is-active', lb.zoomed);
-      lb.zoomBtn.textContent = lb.zoomed ? '🔍 还原' : '🔍 放大';
+      lb.zoomBtn.textContent = lb.zoomed ? ('🔍 ' + lb.scale.toFixed(1) + 'x 还原') : '🔍 放大';
     }
+  }
+
+  function zoomLightboxAt(nextScale, clientX, clientY, animate) {
+    if (!lb.img) return;
+    var clamped = Math.max(1, Math.min(4, nextScale));
+    if (clamped <= 1.03) {
+      lb.scale = 1;
+      lb.tx = 0;
+      lb.ty = 0;
+      applyLightboxTransform(animate);
+      return;
+    }
+    var oldScale = lb.scale || 1;
+    if (typeof clientX === 'number' && typeof clientY === 'number') {
+      var r = lb.img.getBoundingClientRect();
+      var cx = r.left + r.width / 2 - lb.tx;
+      var cy = r.top + r.height / 2 - lb.ty;
+      var dx = (clientX - (cx + lb.tx)) / oldScale;
+      var dy = (clientY - (cy + lb.ty)) / oldScale;
+      lb.tx = clientX - cx - dx * clamped;
+      lb.ty = clientY - cy - dy * clamped;
+    }
+    lb.scale = clamped;
+    clampLightboxPan();
+    applyLightboxTransform(animate);
+  }
+
+  function setLightboxZoom(on, clientX, clientY) {
+    if (!lb.img) return;
+    if (on) {
+      zoomLightboxAt(2.2, clientX, clientY, true);
+    } else {
+      lb.scale = 1;
+      lb.tx = 0;
+      lb.ty = 0;
+      applyLightboxTransform(true);
+    }
+  }
+
+  function preloadAdjacent(idx) {
+    if (lb.items.length <= 1) return;
+    var neighbors = [(idx + 1) % lb.items.length, (idx - 1 + lb.items.length) % lb.items.length];
+    neighbors.forEach(function (ni) {
+      var it = lb.items[ni];
+      if (!it || !it.src) return;
+      var pre = new Image();
+      pre.decoding = 'async';
+      pre.src = it.src;
+    });
   }
 
   function ensureLightbox() {
@@ -399,7 +479,7 @@
     wrap.innerHTML =
       '<button class="lightbox-close" type="button" aria-label="关闭">✕</button>' +
       '<button class="lightbox-nav lightbox-prev" type="button" aria-label="上一张">‹</button>' +
-      '<img class="lightbox-img" alt="">' +
+      '<img class="lightbox-img" alt="" draggable="false">' +
       '<button class="lightbox-nav lightbox-next" type="button" aria-label="下一张">›</button>' +
       '<div class="lightbox-bar"><span class="lightbox-cap"></span><span class="lightbox-badge hidden"></span><button class="lightbox-zoom" type="button" aria-label="缩放预览">🔍 放大</button><a class="lightbox-orig" target="_blank" rel="noopener">原图 ↗</a></div>';
     document.body.appendChild(wrap);
@@ -426,30 +506,164 @@
       setLightboxZoom(!lb.zoomed, e.clientX, e.clientY);
     });
     wrap.addEventListener('click', function (e) {
+      if (lb.suppressClick) { lb.suppressClick = false; return; }
       if (e.target === wrap) closeLightbox();
     });
-    wrap.addEventListener('touchstart', function (e) {
-      if (e.touches && e.touches.length === 1) lb.touchX = e.touches[0].clientX;
-    }, { passive: true });
-    wrap.addEventListener('touchend', function (e) {
-      if (!e.changedTouches || !e.changedTouches.length) return;
-      var t = e.changedTouches[0];
-      var dx = lb.touchX ? (t.clientX - lb.touchX) : 0;
-      lb.touchX = 0;
-      if (!lb.zoomed && Math.abs(dx) > 48 && lb.items.length > 1) {
-        stepLightbox(dx < 0 ? 1 : -1);
+
+    wrap.addEventListener('wheel', function (e) {
+      if (!wrap.classList.contains('is-open')) return;
+      e.preventDefault();
+      var factor = e.deltaY < 0 ? 1.15 : 0.87;
+      zoomLightboxAt(lb.scale * factor, e.clientX, e.clientY, false);
+    }, { passive: false });
+
+    wrap.addEventListener('pointerdown', function (e) {
+      if (!wrap.classList.contains('is-open')) return;
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
+      if (e.target && e.target.closest && e.target.closest('button, a, .lightbox-bar')) return;
+      if (e.target !== lb.img && lb.scale <= 1.04) return;
+      if (e.pointerType !== 'mouse') e.preventDefault();
+      lb.suppressClick = false;
+      lb.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, captured: false });
+      if (lb.ptrs.size === 1) {
+        lb.startX = e.clientX;
+        lb.startY = e.clientY;
+        lb.startTx = lb.tx;
+        lb.startTy = lb.ty;
+        lb.moved = false;
+        lb.dragAxis = lb.scale > 1.04 ? 'pan' : '';
+      } else if (lb.ptrs.size === 2) {
+        var pts = Array.from(lb.ptrs.values());
+        lb.pinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        lb.pinchMidX = (pts[0].x + pts[1].x) / 2;
+        lb.pinchMidY = (pts[0].y + pts[1].y) / 2;
+        lb.dragAxis = 'pinch';
+        lb.moved = true;
+        lb.img.classList.remove('is-anim');
+        try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+    });
+
+    wrap.addEventListener('pointermove', function (e) {
+      var curPtr = lb.ptrs.get(e.pointerId);
+      if (!curPtr) return;
+      e.preventDefault();
+      curPtr.x = e.clientX;
+      curPtr.y = e.clientY;
+      if (lb.ptrs.size === 2) {
+        var pts = Array.from(lb.ptrs.values());
+        var dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        var mx = (pts[0].x + pts[1].x) / 2;
+        var my = (pts[0].y + pts[1].y) / 2;
+        if (lb.pinchDist > 10 && dist > 10) {
+          lb.tx += (mx - lb.pinchMidX);
+          lb.ty += (my - lb.pinchMidY);
+          zoomLightboxAt(lb.scale * (dist / lb.pinchDist), mx, my, false);
+        }
+        lb.pinchDist = dist;
+        lb.pinchMidX = mx;
+        lb.pinchMidY = my;
         return;
       }
-      if (e.target === lb.img && Math.abs(dx) < 12) {
+      if (lb.ptrs.size !== 1) return;
+      var dx = e.clientX - lb.startX;
+      var dy = e.clientY - lb.startY;
+      if (Math.hypot(dx, dy) > 5) {
+        lb.moved = true;
+        if (!curPtr.captured) {
+          curPtr.captured = true;
+          try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+        if (lb.dragAxis === 'pan') lb.img.classList.add('is-dragging');
+      }
+      if (!lb.moved) return;
+
+      if (lb.dragAxis === 'pan') {
+        lb.tx = lb.startTx + dx;
+        lb.ty = lb.startTy + dy;
+        clampLightboxPan();
+        applyLightboxTransform(false);
+        return;
+      }
+      if (!lb.dragAxis && Math.hypot(dx, dy) > 10) {
+        if (Math.abs(dx) > Math.abs(dy) && lb.items.length > 1) lb.dragAxis = 'x';
+        else if (dy > 0) lb.dragAxis = 'y';
+        else lb.dragAxis = 'none';
+      }
+      if (lb.dragAxis === 'x') {
+        lb.tx = dx * 0.72;
+        lb.ty = 0;
+        applyLightboxTransform(false);
+      } else if (lb.dragAxis === 'y') {
+        var pull = Math.max(0, dy);
+        lb.tx = dx * 0.25;
+        lb.ty = pull;
+        lb.el.classList.add('is-swiping');
+        var sc = Math.max(0.82, 1 - pull / 950);
+        lb.img.classList.remove('is-anim');
+        lb.img.style.transform =
+          'translate3d(' + lb.tx.toFixed(1) + 'px,' + pull.toFixed(1) + 'px,0) scale(' + sc.toFixed(4) + ')';
+        lb.el.style.background = 'rgba(11, 18, 34, ' + Math.max(0.22, 0.92 - pull / 480).toFixed(3) + ')';
+      }
+    });
+
+    function endLbPtr(e) {
+      if (!lb.ptrs.has(e.pointerId)) return;
+      lb.ptrs.delete(e.pointerId);
+      if (lb.ptrs.size === 1) {
+        var rem = lb.ptrs.values().next().value;
+        lb.startX = rem.x;
+        lb.startY = rem.y;
+        lb.startTx = lb.tx;
+        lb.startTy = lb.ty;
+        lb.pinchDist = 0;
+        lb.dragAxis = lb.scale > 1.04 ? 'pan' : '';
+        return;
+      }
+      if (lb.ptrs.size > 0) return;
+
+      lb.pinchDist = 0;
+      lb.img.classList.remove('is-dragging');
+      lb.el.classList.remove('is-swiping');
+      lb.el.style.background = '';
+      if (lb.moved) lb.suppressClick = true;
+
+      var axis = lb.dragAxis;
+      lb.dragAxis = '';
+      if (!lb.moved && e.pointerType === 'touch') {
         var now = Date.now();
         if (now - lb.lastTap < 280) {
           lb.lastTap = 0;
-          setLightboxZoom(!lb.zoomed, t.clientX, t.clientY);
+          setLightboxZoom(!lb.zoomed, e.clientX, e.clientY);
         } else {
           lb.lastTap = now;
         }
+      } else if (axis === 'x') {
+        if (Math.abs(lb.tx) > 46 && lb.items.length > 1) {
+          stepLightbox(lb.tx < 0 ? 1 : -1);
+        } else {
+          lb.tx = 0;
+          applyLightboxTransform(true);
+        }
+      } else if (axis === 'y') {
+        if (lb.ty > 92) {
+          closeLightbox();
+        } else {
+          lb.tx = 0;
+          lb.ty = 0;
+          applyLightboxTransform(true);
+        }
+      } else if (axis === 'pan' || axis === 'pinch') {
+        if (lb.scale <= 1.04) {
+          setLightboxZoom(false);
+        } else {
+          clampLightboxPan();
+          applyLightboxTransform(true);
+        }
       }
-    }, { passive: true });
+    }
+    wrap.addEventListener('pointerup', endLbPtr);
+    wrap.addEventListener('pointercancel', endLbPtr);
   }
 
   function setLightboxBadge(text, isHd) {
@@ -465,7 +679,13 @@
 
   function showLightboxIndex(i) {
     if (!lb.items.length) return;
-    setLightboxZoom(false);
+    lb.scale = 1;
+    lb.tx = 0;
+    lb.ty = 0;
+    lb.ptrs.clear();
+    lb.dragAxis = '';
+    applyLightboxTransform(false);
+
     lb.idx = (i + lb.items.length) % lb.items.length;
     var item = lb.items[lb.idx];
     var seq = ++lb.loadSeq;
@@ -504,22 +724,30 @@
       lb.img.src = item.src;
       setLightboxBadge('', false);
     }
+    preloadAdjacent(lb.idx);
   }
 
   function openLightbox(items, startIdx) {
     ensureLightbox();
+    closeTocSheet();
+    closeCmdSearch();
+    document.querySelectorAll('video').forEach(function (v) { try { v.pause(); } catch (_) {} });
     lb.items = items;
     showLightboxIndex(startIdx);
     lb.el.classList.add('is-open');
-    document.body.style.overflow = 'hidden';
+    syncBodyLock();
   }
 
   function closeLightbox() {
     if (!lb.el || !lb.el.classList.contains('is-open')) return;
     lb.loadSeq++;
+    lb.ptrs.clear();
+    lb.dragAxis = '';
+    lb.el.classList.remove('is-swiping');
+    lb.el.style.background = '';
     setLightboxZoom(false);
     lb.el.classList.remove('is-open');
-    document.body.style.overflow = '';
+    syncBodyLock();
   }
 
   function stepLightbox(delta) {
@@ -602,6 +830,14 @@
           }
         } catch (_) {}
       }
+      // Mutual auto-pause so multi-video posts never overlap audio
+      vid.addEventListener('play', function () {
+        document.querySelectorAll('video').forEach(function (other) {
+          if (other !== vid && !other.paused) {
+            try { other.pause(); } catch (_) {}
+          }
+        });
+      });
       var title = (vid.getAttribute('title') || '').trim();
       if (title.length >= 2 && !/\.(mp4|webm|mov|m4v|ogg|ogv)$/i.test(title) && !/^(video|clip|视频)$/i.test(title)) {
         if (!vid.closest('figure')) {
@@ -674,9 +910,84 @@
     });
   }
 
+  var tocSheetEl = null;
+  var tocSheetBody = null;
+  var cmdEl = null;
+  var cmdInput = null;
+  var cmdBody = null;
+  var cmdHits = [];
+  var cmdActiveIdx = 0;
+
+  function syncBodyLock() {
+    var locked =
+      (lb.el && lb.el.classList.contains('is-open')) ||
+      (tocSheetEl && tocSheetEl.classList.contains('is-open')) ||
+      (cmdEl && cmdEl.classList.contains('is-open'));
+    document.body.style.overflow = locked ? 'hidden' : '';
+  }
+
+  function ensureTocSheet() {
+    if (tocSheetEl) return;
+    var el = document.createElement('div');
+    el.id = 'toc-sheet';
+    el.className = 'toc-sheet';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-label', '文章目录导航');
+    el.innerHTML =
+      '<div class="toc-sheet-panel">' +
+      '<div class="toc-sheet-head"><span>✦ 本篇目录导航</span><button type="button" class="toc-sheet-close" aria-label="关闭目录">✕</button></div>' +
+      '<div class="toc-sheet-body"></div>' +
+      '</div>';
+    document.body.appendChild(el);
+    tocSheetEl = el;
+    tocSheetBody = el.querySelector('.toc-sheet-body');
+    el.querySelector('.toc-sheet-close').addEventListener('click', closeTocSheet);
+    el.addEventListener('click', function (e) {
+      if (e.target === el) closeTocSheet();
+    });
+  }
+
+  function openTocSheet() {
+    if (!tocSheetEl) return;
+    tocSheetEl.classList.add('is-open');
+    syncBodyLock();
+    var act = tocSheetBody && tocSheetBody.querySelector('.toc-link.is-active');
+    if (act && act.scrollIntoView) {
+      try { act.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch (_) {}
+    }
+  }
+
+  function closeTocSheet() {
+    if (!tocSheetEl || !tocSheetEl.classList.contains('is-open')) return;
+    tocSheetEl.classList.remove('is-open');
+    syncBodyLock();
+  }
+
+  function applyFontSize(sz, announce) {
+    if (sz === 'sm' || sz === 'lg') {
+      root.setAttribute('data-font', sz);
+      store('asmblog-font', sz);
+    } else {
+      sz = 'md';
+      root.removeAttribute('data-font');
+      store('asmblog-font', 'md');
+    }
+    document.querySelectorAll('.font-btn[data-font-size]').forEach(function (b) {
+      b.classList.toggle('is-active', b.getAttribute('data-font-size') === sz);
+    });
+    if (announce) {
+      var label = sz === 'sm' ? '紧凑字号' : (sz === 'lg' ? '大字舒适模式' : '标准字号');
+      showToast('已切换为' + label + ' ✦');
+    }
+    requestAnimationFrame(recalcMetrics);
+  }
+
   function initArticleExtras() {
     tocEntries = [];
     activeTocId = '';
+    fabsShown = false;
+    closeTocSheet();
 
     var shareBtn = document.getElementById('share-post-btn');
     if (shareBtn && !shareBtn.dataset.bound) {
@@ -688,11 +999,22 @@
       });
     }
 
+    // Reading font-size toggle (A- / A / A+)
+    var curFont = root.getAttribute('data-font') || 'md';
+    document.querySelectorAll('.font-btn[data-font-size]').forEach(function (b) {
+      b.classList.toggle('is-active', b.getAttribute('data-font-size') === curFont);
+      if (!b.dataset.bound) {
+        b.dataset.bound = '1';
+        b.addEventListener('click', function () {
+          applyFontSize(b.getAttribute('data-font-size') || 'md', true);
+        });
+      }
+    });
+
     var prose = document.querySelector('.article-card .prose');
     if (!prose) return;
-
+    var feed = prose.closest('.feed-wrap');
     var headings = Array.prototype.slice.call(prose.querySelectorAll('h2, h3'));
-    if (!headings.length) return;
 
     // Ensure unique IDs & append subtle heading anchor copy links
     headings.forEach(function (h, idx) {
@@ -715,58 +1037,96 @@
       }
     });
 
-    if (headings.length < 2) return;
+    var hasToc = headings.length >= 2;
+    var commentsCard = document.getElementById('comments-card');
 
-    var slot = document.getElementById('article-toc-slot');
-    var feed = prose.closest('.feed-wrap');
-    if (!slot || !feed || slot.dataset.tocBuilt) return;
-    slot.dataset.tocBuilt = '1';
+    if (hasToc) {
+      var slot = document.getElementById('article-toc-slot');
+      if (slot && feed && !slot.dataset.tocBuilt) {
+        slot.dataset.tocBuilt = '1';
 
-    function makeTocList(closeDetails) {
-      var ol = document.createElement('ol');
-      ol.className = 'toc-list';
-      headings.forEach(function (h, idx) {
-        var li = document.createElement('li');
-        li.className = 'toc-item' + (h.tagName === 'H3' ? ' is-sub' : '');
-        var a = document.createElement('a');
-        a.className = 'toc-link';
-        a.href = '#' + h.id;
-        a.setAttribute('data-no-pjax', 'true');
-        var clone = h.cloneNode(true);
-        var rm = clone.querySelector('.heading-anchor');
-        if (rm) rm.remove();
-        a.textContent = (clone.textContent || '').trim();
-        a.addEventListener('click', function (e) {
-          e.preventDefault();
-          if (closeDetails) closeDetails.open = false;
-          history.replaceState(history.state, '', '#' + h.id);
-          h.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
-        });
-        li.appendChild(a);
-        ol.appendChild(li);
-        if (!tocEntries[idx]) tocEntries[idx] = { el: h, id: h.id, top: 0, links: [] };
-        tocEntries[idx].links.push(a);
-      });
-      return ol;
+        function makeTocList(onPick) {
+          var ol = document.createElement('ol');
+          ol.className = 'toc-list';
+          headings.forEach(function (h, idx) {
+            var li = document.createElement('li');
+            li.className = 'toc-item' + (h.tagName === 'H3' ? ' is-sub' : '');
+            var a = document.createElement('a');
+            a.className = 'toc-link';
+            a.href = '#' + h.id;
+            a.setAttribute('data-no-pjax', 'true');
+            var clone = h.cloneNode(true);
+            var rm = clone.querySelector('.heading-anchor');
+            if (rm) rm.remove();
+            a.textContent = (clone.textContent || '').trim();
+            a.addEventListener('click', function (e) {
+              e.preventDefault();
+              if (onPick) onPick();
+              history.replaceState(history.state, '', '#' + h.id);
+              h.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
+            });
+            li.appendChild(a);
+            ol.appendChild(li);
+            if (!tocEntries[idx]) tocEntries[idx] = { el: h, id: h.id, top: 0, links: [] };
+            tocEntries[idx].links.push(a);
+          });
+          return ol;
+        }
+
+        // Mobile / narrow collapsible TOC pill
+        var det = document.createElement('details');
+        det.className = 'toc-mobile';
+        var sum = document.createElement('summary');
+        sum.innerHTML = '<span>✦ 本篇目录</span><span class="toc-mobile-meta">' + headings.length + ' 节 <span class="toc-chevron" aria-hidden="true">▾</span></span>';
+        det.appendChild(sum);
+        det.appendChild(makeTocList(function () { det.open = false; }));
+        slot.appendChild(det);
+
+        // Wide desktop floating TOC card (lives inside #pjax-stage -> auto-cleaned on PJAX!)
+        var aside = document.createElement('aside');
+        aside.id = 'desktop-toc';
+        aside.className = 'toc-desktop';
+        aside.setAttribute('aria-label', '文章目录');
+        aside.innerHTML = '<p class="toc-desktop-title">✦ 目录导航</p>';
+        aside.appendChild(makeTocList(null));
+        feed.appendChild(aside);
+
+        // Mobile slide-up TOC sheet (synced with scroll-spy)
+        ensureTocSheet();
+        tocSheetBody.innerHTML = '';
+        tocSheetBody.appendChild(makeTocList(closeTocSheet));
+      }
     }
 
-    // Mobile / narrow collapsible TOC pill
-    var det = document.createElement('details');
-    det.className = 'toc-mobile';
-    var sum = document.createElement('summary');
-    sum.innerHTML = '<span>✦ 本篇目录</span><span class="toc-mobile-meta">' + headings.length + ' 节 <span class="toc-chevron" aria-hidden="true">▾</span></span>';
-    det.appendChild(sum);
-    det.appendChild(makeTocList(det));
-    slot.appendChild(det);
-
-    // Wide desktop floating TOC card (lives inside #pjax-stage -> auto-cleaned on PJAX!)
-    var aside = document.createElement('aside');
-    aside.id = 'desktop-toc';
-    aside.className = 'toc-desktop';
-    aside.setAttribute('aria-label', '文章目录');
-    aside.innerHTML = '<p class="toc-desktop-title">✦ 目录导航</p>';
-    aside.appendChild(makeTocList(null));
-    feed.appendChild(aside);
+    // Floating mini-FAB stack inside #pjax-stage (mobile TOC drawer + comment quick-jump)
+    if (feed && (hasToc || commentsCard) && !document.getElementById('article-fabs')) {
+      var fabs = document.createElement('div');
+      fabs.id = 'article-fabs';
+      fabs.className = 'article-fabs';
+      if (hasToc) {
+        var tocBtn = document.createElement('button');
+        tocBtn.type = 'button';
+        tocBtn.className = 'fab-btn fab-btn-toc';
+        tocBtn.title = '展开文章目录';
+        tocBtn.setAttribute('aria-label', '展开文章目录');
+        tocBtn.textContent = '☰';
+        tocBtn.addEventListener('click', openTocSheet);
+        fabs.appendChild(tocBtn);
+      }
+      if (commentsCard) {
+        var cmtBtn = document.createElement('button');
+        cmtBtn.type = 'button';
+        cmtBtn.className = 'fab-btn fab-btn-comment';
+        cmtBtn.title = '直达评论区';
+        cmtBtn.setAttribute('aria-label', '直达评论区');
+        cmtBtn.textContent = '💬';
+        cmtBtn.addEventListener('click', function () {
+          commentsCard.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
+        });
+        fabs.appendChild(cmtBtn);
+      }
+      feed.appendChild(fabs);
+    }
   }
 
   function initArchiveYears() {
@@ -796,6 +1156,194 @@
     });
   }
 
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function highlightText(raw, q) {
+    var text = String(raw || '');
+    if (!q) return esc(text);
+    var low = text.toLowerCase();
+    var needle = q.toLowerCase();
+    var out = '';
+    var pos = 0;
+    var idx;
+    while ((idx = low.indexOf(needle, pos)) !== -1) {
+      out += esc(text.slice(pos, idx)) + '<mark class="search-hl">' + esc(text.slice(idx, idx + needle.length)) + '</mark>';
+      pos = idx + needle.length;
+    }
+    out += esc(text.slice(pos));
+    return out;
+  }
+
+  function getSearchIndex(cb) {
+    if (searchIndexCache) { cb(searchIndexCache); return; }
+    fetch('/search-index.json')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        searchIndexCache = Array.isArray(data) ? data : [];
+        cb(searchIndexCache);
+      })
+      .catch(function () {});
+  }
+
+  function filterSearchPosts(list, q) {
+    var needle = q.toLowerCase();
+    return list.filter(function (p) {
+      return (
+        (p.title || '').toLowerCase().indexOf(needle) !== -1 ||
+        (p.summary || '').toLowerCase().indexOf(needle) !== -1 ||
+        (p.category || '').toLowerCase().indexOf(needle) !== -1 ||
+        (p.tags || '').toLowerCase().indexOf(needle) !== -1
+      );
+    });
+  }
+
+  function topSearchKeywords(list, limit) {
+    var freq = {};
+    list.forEach(function (p) {
+      (p.tags || '').split(',').forEach(function (raw) {
+        var t = raw.trim();
+        if (t) freq[t] = (freq[t] || 0) + 1;
+      });
+      if (p.category) freq[p.category] = (freq[p.category] || 0) + 1;
+    });
+    return Object.keys(freq).sort(function (a, b) { return freq[b] - freq[a]; }).slice(0, limit || 10);
+  }
+
+  /* Global Instant Command Search Modal (Ctrl/Cmd+K & /) */
+  function ensureCmdSearch() {
+    if (cmdEl) return;
+    var wrap = document.createElement('div');
+    wrap.id = 'cmd-search';
+    wrap.className = 'cmd-modal';
+    wrap.setAttribute('role', 'dialog');
+    wrap.setAttribute('aria-modal', 'true');
+    wrap.setAttribute('aria-label', '全站快捷搜索');
+    wrap.innerHTML =
+      '<div class="cmd-panel">' +
+      '<div class="cmd-head">' +
+      '<span class="cmd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20 L16.2 16.2"/></svg></span>' +
+      '<input id="cmd-input" class="cmd-input" type="search" placeholder="快速搜索文章、标签、分类..." autocomplete="off">' +
+      '<button type="button" class="cmd-esc">ESC</button>' +
+      '</div>' +
+      '<div id="cmd-body" class="cmd-body"><div class="cmd-empty">正在加载索引…</div></div>' +
+      '<div class="cmd-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> 选择 · <kbd>Enter</kbd> 直达 · <kbd>ESC</kbd> 关闭</span><span>✦ 即时检索</span></div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+    cmdEl = wrap;
+    cmdInput = wrap.querySelector('#cmd-input');
+    cmdBody = wrap.querySelector('#cmd-body');
+    wrap.querySelector('.cmd-esc').addEventListener('click', closeCmdSearch);
+    wrap.addEventListener('click', function (e) {
+      if (e.target === wrap) closeCmdSearch();
+    });
+    cmdInput.addEventListener('input', function () {
+      renderCmdSearch(cmdInput.value.trim());
+    });
+  }
+
+  function updateCmdActive() {
+    if (!cmdBody) return;
+    var items = cmdBody.querySelectorAll('.cmd-item');
+    items.forEach(function (el, idx) {
+      var on = idx === cmdActiveIdx;
+      el.classList.toggle('is-active', on);
+      if (on && el.scrollIntoView) {
+        try { el.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+      }
+    });
+  }
+
+  function jumpCmdIndex(idx) {
+    var p = cmdHits[idx];
+    if (!p || !p.slug) return;
+    closeCmdSearch();
+    smoothNavigate(new URL('/post/' + p.slug + '/', window.location.origin), true);
+  }
+
+  function renderCmdSearch(q) {
+    getSearchIndex(function (list) {
+      if (!cmdBody) return;
+      var hits = q ? filterSearchPosts(list, q) : list.slice(0, 6);
+      cmdHits = hits.slice(0, 12);
+      cmdActiveIdx = 0;
+
+      var html = '';
+      if (!q) {
+        var top = topSearchKeywords(list, 8);
+        if (top.length) {
+          html += '<div class="cmd-section-label">✦ 热门标签快捷搜</div><div class="cmd-chips">' +
+            top.map(function (k) {
+              return '<button type="button" class="search-chip" data-cmd-q="' + esc(k) + '">#' + esc(k) + '</button>';
+            }).join('') + '</div>';
+        }
+        html += '<div class="cmd-section-label">✦ 最新发布</div>';
+      } else {
+        html += '<div class="cmd-section-label">✦ 找到 ' + hits.length + ' 篇相关笔记</div>';
+      }
+
+      if (!cmdHits.length) {
+        html += '<div class="cmd-empty">没有找到与「' + esc(q) + '」相关的内容呢，换个词试试吧～</div>';
+      } else {
+        html += '<div class="cmd-list">' + cmdHits.map(function (p, idx) {
+          var sub = p.summary || (p.category ? ('✦ ' + p.category) : '');
+          return (
+            '<button type="button" class="cmd-item' + (idx === 0 ? ' is-active' : '') + '" data-cmd-idx="' + idx + '">' +
+            '<div class="cmd-item-top"><span class="cmd-item-title">' + highlightText(p.title, q) + '</span>' +
+            '<span class="cmd-item-date">' + esc(p.date) + '</span></div>' +
+            (sub ? '<span class="cmd-item-sub">' + highlightText(sub, q) + '</span>' : '') +
+            '</button>'
+          );
+        }).join('') + '</div>';
+      }
+
+      cmdBody.innerHTML = html;
+      cmdBody.querySelectorAll('[data-cmd-q]').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          var kw = chip.getAttribute('data-cmd-q') || '';
+          cmdInput.value = kw;
+          cmdInput.focus();
+          renderCmdSearch(kw);
+        });
+      });
+      cmdBody.querySelectorAll('[data-cmd-idx]').forEach(function (btn) {
+        btn.addEventListener('mouseenter', function () {
+          cmdActiveIdx = parseInt(btn.getAttribute('data-cmd-idx') || '0', 10);
+          updateCmdActive();
+        });
+        btn.addEventListener('click', function () {
+          jumpCmdIndex(parseInt(btn.getAttribute('data-cmd-idx') || '0', 10));
+        });
+      });
+    });
+  }
+
+  function openCmdSearch() {
+    ensureCmdSearch();
+    closeLightbox();
+    closeTocSheet();
+    cmdEl.classList.add('is-open');
+    syncBodyLock();
+    renderCmdSearch(cmdInput.value.trim());
+    setTimeout(function () { if (cmdInput) { cmdInput.focus(); cmdInput.select(); } }, 20);
+  }
+
+  function closeCmdSearch() {
+    if (!cmdEl || !cmdEl.classList.contains('is-open')) return;
+    cmdEl.classList.remove('is-open');
+    syncBodyLock();
+  }
+
+  var quickSearchBtn = document.getElementById('quick-search-btn');
+  if (quickSearchBtn) {
+    quickSearchBtn.addEventListener('click', openCmdSearch);
+  }
+
   function initSearch() {
     var searchInput = document.getElementById('search-input');
     var resultsBox = document.getElementById('search-results');
@@ -803,41 +1351,9 @@
     var searchForm = document.getElementById('search-form');
     if (!searchInput || !resultsBox) return;
 
-    function esc(s) {
-      return String(s || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function highlightText(raw, q) {
-      var text = String(raw || '');
-      if (!q) return esc(text);
-      var low = text.toLowerCase();
-      var needle = q.toLowerCase();
-      var out = '';
-      var pos = 0;
-      var idx;
-      while ((idx = low.indexOf(needle, pos)) !== -1) {
-        out += esc(text.slice(pos, idx)) + '<mark class="search-hl">' + esc(text.slice(idx, idx + needle.length)) + '</mark>';
-        pos = idx + needle.length;
-      }
-      out += esc(text.slice(pos));
-      return out;
-    }
-
     function renderSuggestions(list) {
       if (!metaBox) return;
-      var freq = {};
-      list.forEach(function (p) {
-        (p.tags || '').split(',').forEach(function (raw) {
-          var t = raw.trim();
-          if (t) freq[t] = (freq[t] || 0) + 1;
-        });
-        if (p.category) freq[p.category] = (freq[p.category] || 0) + 1;
-      });
-      var top = Object.keys(freq).sort(function (a, b) { return freq[b] - freq[a]; }).slice(0, 10);
+      var top = topSearchKeywords(list, 10);
       if (!top.length) {
         metaBox.innerHTML = '';
         return;
@@ -867,15 +1383,7 @@
         recalcMetrics();
         return;
       }
-      var needle = q.toLowerCase();
-      var hits = list.filter(function (p) {
-        return (
-          (p.title || '').toLowerCase().indexOf(needle) !== -1 ||
-          (p.summary || '').toLowerCase().indexOf(needle) !== -1 ||
-          (p.category || '').toLowerCase().indexOf(needle) !== -1 ||
-          (p.tags || '').toLowerCase().indexOf(needle) !== -1
-        );
-      });
+      var hits = filterSearchPosts(list, q);
       if (metaBox) {
         metaBox.innerHTML = '<span class="search-count">✦ 找到 ' + hits.length + ' 篇相关笔记</span>';
       }
@@ -919,17 +1427,7 @@
     }
 
     function runSearch(q) {
-      if (searchIndexCache) {
-        renderHits(searchIndexCache, q);
-        return;
-      }
-      fetch('/search-index.json')
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          searchIndexCache = Array.isArray(data) ? data : [];
-          renderHits(searchIndexCache, q);
-        })
-        .catch(function () {});
+      getSearchIndex(function (list) { renderHits(list, q); });
     }
 
     searchInput.addEventListener('input', function () {
@@ -1114,15 +1612,46 @@
     fetchHtml(u.href).catch(function () {});
   }, true);
 
-  function smoothNavigate(urlObj, push) {
+  // Mobile instant prefetch on touchstart (~100ms head-start before tap release!)
+  document.addEventListener('touchstart', function (e) {
+    if (!e.target || !e.target.closest) return;
+    var a = e.target.closest('a');
+    if (!a) {
+      var card = e.target.closest('.post-card');
+      if (card) a = card.querySelector('.post-card-title a');
+    }
+    if (!isInternalPageLink(a)) return;
+    var u = new URL(a.href, window.location.origin);
+    if (u.pathname === window.location.pathname && u.search === window.location.search) return;
+    fetchHtml(u.href).catch(function () {});
+  }, { passive: true, capture: true });
+
+  function saveCurrentScroll(updateHistory) {
+    var y = Math.max(0, Math.round(window.scrollY || root.scrollTop || 0));
+    scrollMemo.set(currentUrlKey, y);
+    while (scrollMemo.size > 60) {
+      scrollMemo.delete(scrollMemo.keys().next().value);
+    }
+    if (updateHistory) {
+      try {
+        history.replaceState({ url: window.location.href, scrollY: y }, '', window.location.href);
+      } catch (_) {}
+    }
+  }
+
+  function smoothNavigate(urlObj, push, restoreY) {
     closeLightbox();
+    closeTocSheet();
+    closeCmdSearch();
     document.querySelectorAll('video').forEach(function (v) { try { v.pause(); } catch (_) {} });
     if (!stage || isNavigating) {
       window.location.href = urlObj.href;
       return;
     }
     if (urlObj.pathname === window.location.pathname && urlObj.search === window.location.search) {
-      if (urlObj.hash) {
+      if (typeof restoreY === 'number') {
+        window.scrollTo(0, restoreY);
+      } else if (urlObj.hash) {
         var anchor = document.querySelector(urlObj.hash);
         if (anchor) anchor.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
       } else {
@@ -1131,6 +1660,7 @@
       return;
     }
 
+    saveCurrentScroll(!!push);
     isNavigating = true;
     updateNavState(urlObj.pathname);
     startLoader();
@@ -1153,9 +1683,12 @@
 
         stage.innerHTML = nextStage.innerHTML;
         document.title = doc.title || document.title;
-        if (push) history.pushState({ url: urlObj.href }, '', urlObj.href);
+        if (push) history.pushState({ url: urlObj.href, scrollY: 0 }, '', urlObj.href);
+        currentUrlKey = urlObj.pathname + urlObj.search;
 
-        if (urlObj.hash) {
+        if (typeof restoreY === 'number' && restoreY > 0) {
+          window.scrollTo(0, restoreY);
+        } else if (urlObj.hash) {
           var targetEl = document.querySelector(urlObj.hash);
           if (targetEl) targetEl.scrollIntoView({ behavior: 'auto' });
           else window.scrollTo(0, 0);
@@ -1171,6 +1704,12 @@
         finishLoader();
         isNavigating = false;
         hydratePage(true);
+        if (typeof restoreY === 'number' && restoreY > 0) {
+          requestAnimationFrame(function () {
+            window.scrollTo(0, restoreY);
+            paintScroll();
+          });
+        }
       })
       .catch(function () {
         finishLoader();
@@ -1203,29 +1742,67 @@
     }
   });
 
-  window.addEventListener('popstate', function () {
-    smoothNavigate(new URL(window.location.href), false);
+  window.addEventListener('popstate', function (e) {
+    var dest = new URL(window.location.href);
+    var destKey = dest.pathname + dest.search;
+    var savedY = (e.state && typeof e.state.scrollY === 'number')
+      ? e.state.scrollY
+      : (scrollMemo.has(destKey) ? scrollMemo.get(destKey) : 0);
+    smoothNavigate(dest, false, savedY);
   });
 
   document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      if (cmdEl && cmdEl.classList.contains('is-open')) closeCmdSearch();
+      else openCmdSearch();
+      return;
+    }
+    if (cmdEl && cmdEl.classList.contains('is-open')) {
+      if (e.key === 'Escape') { e.preventDefault(); closeCmdSearch(); }
+      else if (e.key === 'ArrowDown' && cmdHits.length) {
+        e.preventDefault();
+        cmdActiveIdx = (cmdActiveIdx + 1) % cmdHits.length;
+        updateCmdActive();
+      } else if (e.key === 'ArrowUp' && cmdHits.length) {
+        e.preventDefault();
+        cmdActiveIdx = (cmdActiveIdx - 1 + cmdHits.length) % cmdHits.length;
+        updateCmdActive();
+      } else if (e.key === 'Enter' && cmdHits.length) {
+        e.preventDefault();
+        jumpCmdIndex(cmdActiveIdx);
+      }
+      return;
+    }
+    if (tocSheetEl && tocSheetEl.classList.contains('is-open')) {
+      if (e.key === 'Escape') { e.preventDefault(); closeTocSheet(); }
+      return;
+    }
     if (lb.el && lb.el.classList.contains('is-open')) {
       if (e.key === 'Escape') { e.preventDefault(); closeLightbox(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); stepLightbox(-1); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
+      else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomLightboxAt(lb.scale * 1.25, window.innerWidth / 2, window.innerHeight / 2, true); }
+      else if (e.key === '-') { e.preventDefault(); zoomLightboxAt(lb.scale * 0.8, window.innerWidth / 2, window.innerHeight / 2, true); }
+      else if (e.key === '0') { e.preventDefault(); setLightboxZoom(false); }
       return;
     }
-    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    var tag = document.activeElement ? document.activeElement.tagName : '';
+    if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA' && !(document.activeElement && document.activeElement.isContentEditable)) {
       var inp = document.getElementById('search-input');
       if (inp) {
         e.preventDefault();
         inp.focus();
       } else {
         e.preventDefault();
-        smoothNavigate(new URL('/search/', window.location.origin), true);
+        openCmdSearch();
       }
     }
   });
 
+  try {
+    history.replaceState({ url: window.location.href, scrollY: window.scrollY || 0 }, '', window.location.href);
+  } catch (_) {}
   hydratePage(false);
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { updateNavState(); });

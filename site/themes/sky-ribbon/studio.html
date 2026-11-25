@@ -87,6 +87,7 @@
       padding: 20px;
     }
     .gate-card {
+      position: relative;
       width: 100%;
       max-width: 400px;
       background: var(--surface);
@@ -95,6 +96,15 @@
       padding: 32px 28px;
       box-shadow: var(--shadow);
       text-align: center;
+    }
+    .gate-theme-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      border-radius: 50%;
     }
     .gate-avatar {
       width: 78px;
@@ -451,6 +461,87 @@
       color: var(--lilac-fg);
     }
     .tb-spacer { flex: 1; }
+    .word-count {
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: var(--muted);
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .upload-progress {
+      height: 5px;
+      width: 100%;
+      background: var(--surface-soft);
+      border-left: 1.5px solid var(--border);
+      border-right: 1.5px solid var(--border);
+      overflow: hidden;
+    }
+    .upload-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #5cb8ff, #b9a4ff, #ff94c2);
+      transition: width 0.18s ease;
+    }
+    .draft-restore-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding: 11px 15px;
+      border-radius: 16px;
+      border: 1.5px solid var(--border-strong);
+      background: linear-gradient(120deg, var(--sky-soft), var(--pink-soft));
+      color: var(--fg);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .draft-restore-ops { display: flex; gap: 8px; flex-wrap: wrap; }
+    .save-status-pill {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--ok);
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--ok-soft);
+    }
+    .save-status-pill.is-dirty {
+      color: var(--pink-fg);
+      background: var(--pink-soft);
+    }
+    .posts-filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: var(--surface-soft);
+      border: 1.5px solid var(--border);
+    }
+    .posts-filter-bar .inp { flex: 1; min-width: 180px; padding: 8px 13px; font-size: 0.88rem; }
+    .posts-filter-bar .sel { width: auto; min-width: 130px; padding: 8px 12px; font-size: 0.86rem; }
+    .filter-pills { display: inline-flex; gap: 5px; flex-wrap: wrap; }
+    .filter-pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--fg-2);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .filter-pill.is-active {
+      background: linear-gradient(120deg, var(--sky-soft), var(--pink-soft));
+      border-color: var(--border-strong);
+      color: var(--sky-fg);
+    }
     .md-split {
       display: grid;
       grid-template-columns: 1fr;
@@ -591,6 +682,7 @@
 <!-- Unlock Gate -->
 <div id="gate-view" class="gate-wrap">
   <div class="gate-card">
+    <button id="gate-theme-btn" class="btn btn-sm gate-theme-btn" type="button" title="切换日/夜间模式" aria-label="切换主题">☾</button>
     <img id="gate-avatar" class="gate-avatar" src="/static/avatar.webp?v=3&orig=/static/avatar.jpg" alt="Author">
     <h1>✦ 作者秘密写作室</h1>
     <p class="gate-sub">仅博主本人可见 · 请输入写作口令解锁</p>
@@ -616,6 +708,7 @@
       <button class="tab-btn" data-tab="settings" type="button">⚙️ 站点设置</button>
     </nav>
     <div class="top-actions">
+      <button id="studio-theme-btn" class="btn btn-sm" type="button" title="切换晴空 / 星河夜间模式">☾ 夜间</button>
       <a class="btn btn-soft btn-sm" href="/" target="_blank">访问小站 ↗</a>
       <button id="logout-btn" class="btn btn-sm" type="button">锁定退出</button>
     </div>
@@ -627,9 +720,18 @@
       <h2 class="panel-title">
         <span id="editor-mode-label">✍️ 发布新文章</span>
         <span id="editor-slug-badge" class="badge hidden"></span>
+        <span id="draft-save-status" class="save-status-pill hidden"></span>
       </h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="new-post-btn" class="btn btn-soft btn-sm" type="button">+ 新建空白文章</button>
+      </div>
+    </div>
+
+    <div id="draft-restore-bar" class="draft-restore-bar hidden">
+      <span id="draft-restore-msg">✦ 检测到上次未发布的本地草稿</span>
+      <div class="draft-restore-ops">
+        <button id="draft-restore-btn" class="btn btn-primary btn-sm" type="button">恢复草稿</button>
+        <button id="draft-discard-btn" class="btn btn-sm" type="button">丢弃</button>
       </div>
     </div>
 
@@ -700,12 +802,16 @@
         <button class="tb-btn" data-md="link" type="button">🔗 链接</button>
         <span class="tb-spacer"></span>
         <span id="img-status" class="field-hint"></span>
+        <span id="word-count-badge" class="word-count">0 字</span>
         <button id="tb-preview" class="tb-btn" type="button">👁️ 开启预览</button>
         <input id="inline-files" type="file" accept="image/*" multiple class="hidden">
         <input id="inline-vid-file" type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg,.mp4,.webm,.mov,.ogg" class="hidden">
       </div>
+      <div id="upload-progress-wrap" class="upload-progress hidden">
+        <div id="upload-progress-fill" class="upload-progress-fill"></div>
+      </div>
       <div id="md-split" class="md-split">
-        <textarea id="f-content" class="md-area" placeholder="在这里写下今天的心情、故事、插画和视频吧...&#10;&#10;小提示：直接拖入图片或 MP4/WebM 视频、粘贴截图即可自动上传并插入！"></textarea>
+        <textarea id="f-content" class="md-area" placeholder="在这里写下今天的心情、故事、插画和视频吧...&#10;&#10;快捷键：Ctrl+S 保存发布 · Ctrl+B 粗体 · Ctrl+I 斜体 · Ctrl+K 链接 · 直接拖入或粘贴图片/视频即可自动上传！"></textarea>
         <div id="md-preview" class="md-preview hidden"></div>
       </div>
     </div>
@@ -715,7 +821,8 @@
         <input id="f-draft" type="checkbox">
         <span>存为草稿（暂不在前台公开显示）</span>
       </label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span class="field-hint">快捷键 Ctrl+S 保存</span>
         <button id="save-btn" class="btn btn-primary" type="button">✦ 发布文章</button>
       </div>
     </div>
@@ -724,8 +831,19 @@
   <!-- TAB 2: Posts Management -->
   <section id="tab-posts" class="panel hidden">
     <div class="panel-head">
-      <h2 class="panel-title">📚 全部文章管理</h2>
+      <h2 class="panel-title">📚 全部文章管理 <span id="posts-match-count" class="badge"></span></h2>
       <button id="refresh-posts-btn" class="btn btn-soft btn-sm" type="button">↻ 刷新列表</button>
+    </div>
+    <div id="posts-filter-bar" class="posts-filter-bar">
+      <input id="posts-search" class="inp" type="search" placeholder="🔍 搜索文章标题、标签或网址 Slug...">
+      <div class="filter-pills" role="group" aria-label="状态筛选">
+        <button type="button" class="filter-pill is-active" data-post-status="all">全部</button>
+        <button type="button" class="filter-pill" data-post-status="pub">已发布</button>
+        <button type="button" class="filter-pill" data-post-status="draft">草稿</button>
+      </div>
+      <select id="posts-cat-filter" class="sel" aria-label="按分类筛选">
+        <option value="">全部分类</option>
+      </select>
     </div>
     <div id="posts-list" class="item-list"></div>
   </section>
@@ -929,6 +1047,12 @@
 
   var inlineFiles = document.getElementById('inline-files');
   var imgStatus = document.getElementById('img-status');
+  var wordCountBadge = document.getElementById('word-count-badge');
+  var uploadProgressWrap = document.getElementById('upload-progress-wrap');
+  var uploadProgressFill = document.getElementById('upload-progress-fill');
+  var draftSaveStatus = document.getElementById('draft-save-status');
+  var draftRestoreBar = document.getElementById('draft-restore-bar');
+  var draftRestoreMsg = document.getElementById('draft-restore-msg');
   var mdSplit = document.getElementById('md-split');
   var mdPreview = document.getElementById('md-preview');
   var tbPreview = document.getElementById('tb-preview');
@@ -937,12 +1061,205 @@
   var editorSlugBadge = document.getElementById('editor-slug-badge');
   var saveBtn = document.getElementById('save-btn');
   var postsList = document.getElementById('posts-list');
+  var postsSearch = document.getElementById('posts-search');
+  var postsCatFilter = document.getElementById('posts-cat-filter');
+  var postsMatchCount = document.getElementById('posts-match-count');
   var catsGrid = document.getElementById('cats-grid');
   var cntPosts = document.getElementById('cnt-posts');
   var cntCats = document.getElementById('cnt-cats');
   var toastEl = document.getElementById('toast');
+  var studioThemeBtn = document.getElementById('studio-theme-btn');
+  var gateThemeBtn = document.getElementById('gate-theme-btn');
 
-  var state = { posts: [], cats: [], editingSlug: '', previewOn: false, toastTimer: null };
+  var DRAFT_KEY = 'asmblog-studio-draft-v1';
+  var state = {
+    posts: [],
+    cats: [],
+    editingSlug: '',
+    previewOn: false,
+    toastTimer: null,
+    activeTab: 'write',
+    dirty: false,
+    draftTimer: null,
+    postFilterStatus: 'all'
+  };
+
+  /* Studio Day/Night Theme Toggle (shared with public site via asmblog-theme) */
+  function syncStudioThemeUI() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (studioThemeBtn) studioThemeBtn.textContent = dark ? '☀ 日间' : '☾ 夜间';
+    if (gateThemeBtn) gateThemeBtn.textContent = dark ? '☀' : '☾';
+  }
+  function toggleStudioTheme() {
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('asmblog-theme', next); } catch (_) {}
+    syncStudioThemeUI();
+  }
+  if (studioThemeBtn) studioThemeBtn.addEventListener('click', toggleStudioTheme);
+  if (gateThemeBtn) gateThemeBtn.addEventListener('click', toggleStudioTheme);
+  syncStudioThemeUI();
+
+  /* Live Word Count & Reading Estimate */
+  function updateWordCount() {
+    if (!wordCountBadge) return;
+    var txt = (fContent.value || '').replace(/!\[[^\]]*\]\([^)]+\)/g, '').trim();
+    if (!txt) { wordCountBadge.textContent = '0 字'; return; }
+    var cjk = (txt.match(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/g) || []).length;
+    var latin = (txt.replace(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/g, ' ').match(/[A-Za-z0-9_]+/g) || []).length;
+    var total = cjk + latin;
+    var mins = Math.max(1, Math.round(total / 350));
+    wordCountBadge.textContent = total.toLocaleString() + ' 字 · 约 ' + mins + ' 分钟';
+  }
+
+  /* Slim Visual Upload Progress Bar */
+  var progressHideTimer = null;
+  function setUploadProgress(pct) {
+    if (!uploadProgressWrap || !uploadProgressFill) return;
+    clearTimeout(progressHideTimer);
+    if (pct === null || pct < 0) {
+      uploadProgressWrap.classList.add('hidden');
+      uploadProgressFill.style.width = '0%';
+      return;
+    }
+    var p = Math.min(100, Math.max(2, Math.round(pct)));
+    uploadProgressWrap.classList.remove('hidden');
+    uploadProgressFill.style.width = p + '%';
+    if (p >= 100) {
+      progressHideTimer = setTimeout(function () {
+        uploadProgressWrap.classList.add('hidden');
+        uploadProgressFill.style.width = '0%';
+      }, 650);
+    }
+  }
+
+  /* Local Anti-Loss Draft Auto-Save + Recovery */
+  function formatHHMM(ts) {
+    var d = new Date(ts || Date.now());
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  function readLocalDraft() {
+    try {
+      var raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (!obj || typeof obj !== 'object') return null;
+      if (!((obj.title || '').trim() || (obj.content || '').trim() || (obj.cover || '').trim())) return null;
+      return obj;
+    } catch (_) { return null; }
+  }
+
+  function clearLocalDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
+    if (draftRestoreBar) draftRestoreBar.classList.add('hidden');
+  }
+
+  function setSaveStatus(text, isDirty) {
+    if (!draftSaveStatus) return;
+    if (!text) {
+      draftSaveStatus.textContent = '';
+      draftSaveStatus.classList.add('hidden');
+      return;
+    }
+    draftSaveStatus.textContent = text;
+    draftSaveStatus.className = 'save-status-pill' + (isDirty ? ' is-dirty' : '');
+  }
+
+  function writeLocalDraftNow() {
+    var obj = {
+      editingSlug: state.editingSlug || '',
+      title: fTitle.value || '',
+      category: fCat.value || '',
+      tags: fTags.value || '',
+      slug: fSlug.value || '',
+      date: fDate.value || todayStr(),
+      summary: fSummary.value || '',
+      cover: fCover.value || '',
+      draft: !!fDraft.checked,
+      content: fContent.value || '',
+      savedAt: Date.now()
+    };
+    if (!obj.title.trim() && !obj.content.trim() && !obj.cover.trim()) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(obj));
+      setSaveStatus('已本地暂存 ' + formatHHMM(obj.savedAt), true);
+    } catch (_) {}
+  }
+
+  function markDirty() {
+    state.dirty = true;
+    clearTimeout(state.draftTimer);
+    state.draftTimer = setTimeout(writeLocalDraftNow, 750);
+  }
+
+  function checkDraftRecovery() {
+    if (!draftRestoreBar) return;
+    var d = readLocalDraft();
+    if (!d) {
+      draftRestoreBar.classList.add('hidden');
+      return;
+    }
+    var name = (d.title || '').trim() || '未命名文章';
+    if (name.length > 26) name = name.slice(0, 26) + '…';
+    draftRestoreMsg.textContent = '✦ 检测到未发布的本地暂存草稿「' + name + '」（保存于 ' + formatHHMM(d.savedAt) + '）';
+    draftRestoreBar.classList.remove('hidden');
+  }
+
+  function confirmDiscardDirty() {
+    if (!state.dirty) return true;
+    return confirm('当前编辑的内容尚未发布/保存，确定放弃当前修改并切换吗？');
+  }
+
+  document.getElementById('draft-restore-btn').addEventListener('click', function () {
+    var d = readLocalDraft();
+    if (!d) { draftRestoreBar.classList.add('hidden'); return; }
+    state.editingSlug = d.editingSlug || '';
+    fTitle.value = d.title || '';
+    fSlug.value = d.slug || '';
+    fSlug.readOnly = !!state.editingSlug;
+    fDate.value = d.date || todayStr();
+    fCat.value = d.category || '';
+    fTags.value = d.tags || '';
+    fSummary.value = d.summary || '';
+    fCover.value = d.cover || '';
+    fContent.value = d.content || '';
+    fDraft.checked = !!d.draft;
+    editorModeLabel.textContent = state.editingSlug ? '✏️ 编辑文章' : '✍️ 发布新文章';
+    if (state.editingSlug) {
+      editorSlugBadge.textContent = state.editingSlug;
+      editorSlugBadge.classList.remove('hidden');
+      saveBtn.textContent = '✦ 保存修改';
+    } else {
+      editorSlugBadge.classList.add('hidden');
+      saveBtn.textContent = '✦ 发布文章';
+    }
+    syncCoverUI();
+    updateWordCount();
+    if (state.previewOn) renderPreview();
+    state.dirty = true;
+    draftRestoreBar.classList.add('hidden');
+    setSaveStatus('已恢复本地草稿', true);
+    showToast('本地草稿已恢复，可继续编辑 ✦');
+  });
+
+  document.getElementById('draft-discard-btn').addEventListener('click', function () {
+    clearLocalDraft();
+    showToast('已清除本地暂存草稿');
+  });
+
+  [fTitle, fCat, fTags, fSlug, fDate, fSummary, fCover, fDraft, fContent].forEach(function (el) {
+    if (!el) return;
+    el.addEventListener('input', markDirty);
+    el.addEventListener('change', markDirty);
+  });
+
+  window.addEventListener('beforeunload', function (e) {
+    if (!state.dirty) return;
+    writeLocalDraftNow();
+    e.preventDefault();
+    e.returnValue = '';
+  });
 
   function todayStr() {
     var d = new Date();
@@ -999,6 +1316,7 @@
 
   /* Tabs */
   function switchTab(name) {
+    state.activeTab = name;
     document.querySelectorAll('.tab-btn').forEach(function (b) {
       b.classList.toggle('is-active', b.getAttribute('data-tab') === name);
     });
@@ -1032,6 +1350,7 @@
   coverClearBtn.addEventListener('click', function () {
     fCover.value = '';
     syncCoverUI();
+    markDirty();
   });
 
   /* Dual-Tier Image Pipeline: Fast WebP Preview + Full-Quality Original (?orig=...) */
@@ -1258,6 +1577,7 @@
     crop.onDone = opts.onDone || function (url) {
       fCover.value = url;
       syncCoverUI();
+      markDirty();
       coverStatus.textContent = '封面已裁剪上传 ✦';
       showToast('封面图裁剪并上传成功 ✦');
     };
@@ -1376,6 +1696,23 @@
   document.getElementById('crop-reset').addEventListener('click', function () { resetCropPosition('reset'); });
   document.getElementById('crop-close-btn').addEventListener('click', closeCropper);
   document.getElementById('crop-cancel-btn').addEventListener('click', closeCropper);
+  cropModal.addEventListener('click', function (e) {
+    if (e.target === cropModal) closeCropper();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && crop.open) {
+      e.preventDefault();
+      closeCropper();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      if (appView.classList.contains('hidden')) return;
+      e.preventDefault();
+      if (state.activeTab === 'write' && !saveBtn.disabled) saveBtn.click();
+      else if (state.activeTab === 'settings' && !saveSettingsBtn.disabled) saveSettingsBtn.click();
+    }
+  });
 
   cropGifRawBtn.addEventListener('click', function () {
     if (!crop.rawFile) return;
@@ -1500,6 +1837,8 @@
     var text = before + sel + (after || '');
     fContent.setRangeText(text, start, end, 'end');
     fContent.focus();
+    markDirty();
+    updateWordCount();
     if (state.previewOn) renderPreview();
   }
 
@@ -1602,12 +1941,15 @@
     if (!arr.length) return;
     var chain = Promise.resolve();
     var okCount = 0;
+    setUploadProgress(3);
     arr.forEach(function (file, idx) {
       chain = chain.then(function () {
         var mbAll = (file.size / 1048576).toFixed(1);
         imgStatus.textContent = '🎬 正在上传视频 (' + (idx + 1) + '/' + arr.length + ') 0% · ' + mbAll + 'MB';
         return uploadVideoFile(file, function (sent, total) {
           var pct = Math.min(100, Math.round((sent / total) * 100));
+          var overall = ((idx + sent / total) / arr.length) * 100;
+          setUploadProgress(overall);
           var mbSent = (sent / 1048576).toFixed(1);
           imgStatus.textContent = '🎬 上传视频中 ' + pct + '% (' + mbSent + ' / ' + mbAll + ' MB)...';
         }).then(function (url) {
@@ -1619,10 +1961,12 @@
     });
     chain
       .then(function () {
+        setUploadProgress(100);
         imgStatus.textContent = '已插入 ' + okCount + ' 个视频 ✦';
         showToast('视频已上传并插入文章，支持在线流畅播放 ✦');
       })
       .catch(function (err) {
+        setUploadProgress(-1);
         imgStatus.textContent = '';
         showToast(esc(err.message), true);
       });
@@ -1634,24 +1978,28 @@
     var vids = all.filter(isVideoFile);
     if (imgs.length) {
       imgStatus.textContent = '正在上传 ' + imgs.length + ' 张图片...';
+      setUploadProgress(8);
       var chain = Promise.resolve();
       var okCount = 0;
-      imgs.forEach(function (file) {
+      imgs.forEach(function (file, idx) {
         chain = chain.then(function () {
           return uploadImageFile(file).then(function (url) {
             var alt = (file.name || '图片').replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '') || '图片';
             insertAtCursor('\n![' + alt + '](' + url + ')\n', '');
             okCount++;
+            setUploadProgress(((idx + 1) / imgs.length) * 100);
           });
         });
       });
       chain
         .then(function () {
+          setUploadProgress(100);
           imgStatus.textContent = '已插入 ' + okCount + ' 张图片 ✦';
           showToast('已上传并插入 ' + okCount + ' 张图片 ✦');
           if (vids.length) uploadInlineVideos(vids);
         })
         .catch(function (err) {
+          setUploadProgress(-1);
           imgStatus.textContent = '';
           showToast(esc(err.message), true);
         });
@@ -1684,16 +2032,37 @@
   fContent.addEventListener('paste', function (e) {
     var items = e.clipboardData && e.clipboardData.items;
     if (!items) return;
-    var imgs = [];
+    var media = [];
     for (var i = 0; i < items.length; i++) {
-      if (items[i].type && items[i].type.indexOf('image/') === 0) {
-        var f = items[i].getAsFile();
-        if (f) imgs.push(f);
+      var f = items[i].kind === 'file' ? items[i].getAsFile() : null;
+      if (f && ((f.type && f.type.indexOf('image/') === 0) || isVideoFile(f))) {
+        media.push(f);
       }
     }
-    if (imgs.length) {
+    if (media.length) {
       e.preventDefault();
-      uploadInlineFiles(imgs);
+      uploadInlineFiles(media);
+    }
+  });
+
+  /* Markdown Editor Keyboard Shortcuts (Ctrl+B / Ctrl+I / Ctrl+K / Tab) */
+  fContent.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      insertAtCursor('  ', '');
+      return;
+    }
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    var k = (e.key || '').toLowerCase();
+    if (k === 'b') { e.preventDefault(); insertAtCursor('**', '**'); }
+    else if (k === 'i') { e.preventDefault(); insertAtCursor('*', '*'); }
+    else if (k === 'k') {
+      e.preventDefault();
+      var s = fContent.selectionStart || 0;
+      var en = fContent.selectionEnd || 0;
+      var sel = fContent.value.slice(s, en).trim();
+      if (/^(https?:\/\/|\/)/i.test(sel)) insertAtCursor('[链接文字](', ')');
+      else insertAtCursor('[', '](https://)');
     }
   });
 
@@ -1734,6 +2103,7 @@
       return '<a href="' + esc(safeUrl(url)) + '" target="_blank">' + txt + '</a>';
     });
     out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
+    out = out.replace(/~~([^~]+)~~/g, '<del>$1</del>');
     out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>');
     return out;
@@ -1743,31 +2113,37 @@
     var html = [];
     var inCode = false;
     var codeBuf = [];
-    var inUl = false;
-    function closeUl() { if (inUl) { html.push('</ul>'); inUl = false; } }
+    var listTag = '';
+    function closeList() { if (listTag) { html.push('</' + listTag + '>'); listTag = ''; } }
 
     for (var i = 0; i < lines.length; i++) {
       var ln = lines[i];
       if (/^```/.test(ln)) {
-        closeUl();
+        closeList();
         if (!inCode) { inCode = true; codeBuf = []; }
         else { html.push('<pre><code>' + esc(codeBuf.join('\n')) + '</code></pre>'); inCode = false; }
         continue;
       }
       if (inCode) { codeBuf.push(ln); continue; }
-      if (!ln.trim()) { closeUl(); continue; }
+      if (!ln.trim()) { closeList(); continue; }
+      if (/^(\*{3,}|-{3,}|_{3,})\s*$/.test(ln.trim())) { closeList(); html.push('<hr>'); continue; }
       var hm = ln.match(/^(#{1,4})\s+(.*)$/);
-      if (hm) { closeUl(); var lvl = hm[1].length; html.push('<h' + lvl + '>' + mdInline(hm[2]) + '</h' + lvl + '>'); continue; }
-      if (/^>\s?/.test(ln)) { closeUl(); html.push('<blockquote>' + mdInline(ln.replace(/^>\s?/, '')) + '</blockquote>'); continue; }
+      if (hm) { closeList(); var lvl = hm[1].length; html.push('<h' + lvl + '>' + mdInline(hm[2]) + '</h' + lvl + '>'); continue; }
+      if (/^>\s?/.test(ln)) { closeList(); html.push('<blockquote>' + mdInline(ln.replace(/^>\s?/, '')) + '</blockquote>'); continue; }
       if (/^[-*]\s+/.test(ln)) {
-        if (!inUl) { html.push('<ul>'); inUl = true; }
+        if (listTag !== 'ul') { closeList(); html.push('<ul>'); listTag = 'ul'; }
         html.push('<li>' + mdInline(ln.replace(/^[-*]\s+/, '')) + '</li>');
         continue;
       }
-      closeUl();
+      if (/^\d+\.\s+/.test(ln)) {
+        if (listTag !== 'ol') { closeList(); html.push('<ol>'); listTag = 'ol'; }
+        html.push('<li>' + mdInline(ln.replace(/^\d+\.\s+/, '')) + '</li>');
+        continue;
+      }
+      closeList();
       html.push('<p>' + mdInline(ln) + '</p>');
     }
-    closeUl();
+    closeList();
     if (inCode) html.push('<pre><code>' + esc(codeBuf.join('\n')) + '</code></pre>');
     mdPreview.innerHTML = html.join('') || '<p style="color:var(--muted)">预览区为空，开始输入正文吧～</p>';
   }
@@ -1780,12 +2156,23 @@
     if (state.previewOn) renderPreview();
   });
   fContent.addEventListener('input', function () {
+    updateWordCount();
     if (state.previewOn) renderPreview();
   });
+  fContent.addEventListener('scroll', function () {
+    if (!state.previewOn) return;
+    var maxSrc = fContent.scrollHeight - fContent.clientHeight;
+    var maxDst = mdPreview.scrollHeight - mdPreview.clientHeight;
+    if (maxSrc > 0 && maxDst > 0) {
+      mdPreview.scrollTop = (fContent.scrollTop / maxSrc) * maxDst;
+    }
+  }, { passive: true });
 
   /* Reset Editor for New Post */
   function resetEditor() {
     state.editingSlug = '';
+    state.dirty = false;
+    clearTimeout(state.draftTimer);
     fTitle.value = '';
     fSlug.value = '';
     fSlug.readOnly = false;
@@ -1798,13 +2185,17 @@
     fDraft.checked = false;
     coverStatus.textContent = '';
     imgStatus.textContent = '';
+    setUploadProgress(-1);
+    setSaveStatus('', false);
     editorModeLabel.textContent = '✍️ 发布新文章';
     editorSlugBadge.classList.add('hidden');
     saveBtn.textContent = '✦ 发布文章';
     syncCoverUI();
+    updateWordCount();
     if (state.previewOn) renderPreview();
   }
   document.getElementById('new-post-btn').addEventListener('click', function () {
+    if (!confirmDiscardDirty()) return;
     resetEditor();
     showToast('已切换为新建空白文章 ✦');
   });
@@ -1844,6 +2235,10 @@
     api('POST', '/api/studio/posts', payload)
       .then(function (res) {
         state.editingSlug = res.slug;
+        state.dirty = false;
+        clearTimeout(state.draftTimer);
+        clearLocalDraft();
+        setSaveStatus('已保存同步 ' + formatHHMM(Date.now()) + ' ✦', false);
         fSlug.readOnly = true;
         editorModeLabel.textContent = '✏️ 编辑文章';
         editorSlugBadge.textContent = res.slug;
@@ -1877,6 +2272,16 @@
     fCat.innerHTML = opts;
     fCat.value = prevVal;
 
+    if (postsCatFilter) {
+      var prevFilter = postsCatFilter.value;
+      var fOpts = '<option value="">全部分类</option>';
+      state.cats.forEach(function (c) {
+        fOpts += '<option value="' + esc(c.name) + '">' + esc(c.name) + ' (' + c.count + ')</option>';
+      });
+      postsCatFilter.innerHTML = fOpts;
+      postsCatFilter.value = prevFilter;
+    }
+
     if (!state.cats.length) {
       catsGrid.innerHTML = '<p style="color:var(--muted)">还没有任何分类，在上方添加一个吧～</p>';
       return;
@@ -1894,19 +2299,43 @@
     }).join('');
   }
 
-  /* Load Posts into Management List */
+  /* Load Posts into Management List (with Search, Status & Category Filter + 1-Click Publish/Draft) */
   function renderPosts() {
     cntPosts.textContent = String(state.posts.length);
     if (!state.posts.length) {
+      if (postsMatchCount) postsMatchCount.textContent = '0 篇';
       postsList.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0">还没有发布过文章，去「写文章」创作第一篇吧～</p>';
       return;
     }
-    postsList.innerHTML = state.posts.map(function (p) {
+    var q = postsSearch ? postsSearch.value.trim().toLowerCase() : '';
+    var catF = postsCatFilter ? postsCatFilter.value : '';
+    var stF = state.postFilterStatus || 'all';
+    var filtered = state.posts.filter(function (p) {
+      if (stF === 'pub' && p.draft) return false;
+      if (stF === 'draft' && !p.draft) return false;
+      if (catF && (p.category || '') !== catF) return false;
+      if (q) {
+        var hay = ((p.title || '') + ' ' + (p.slug || '') + ' ' + (p.tags || '') + ' ' + (p.category || '')).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+    if (postsMatchCount) {
+      postsMatchCount.textContent = filtered.length === state.posts.length
+        ? ('共 ' + state.posts.length + ' 篇')
+        : ('筛选 ' + filtered.length + ' / ' + state.posts.length + ' 篇');
+    }
+    if (!filtered.length) {
+      postsList.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0">没有符合筛选条件的文章，换个关键词或分类试试吧～</p>';
+      return;
+    }
+    postsList.innerHTML = filtered.map(function (p) {
       var thumb = p.cover
-        ? '<img class="post-row-thumb" src="' + esc(p.cover) + '" alt="">'
+        ? '<img class="post-row-thumb" src="' + esc(p.cover) + '" alt="" loading="lazy">'
         : '';
       var catBadge = p.category ? '<span class="badge badge-lilac">✦ ' + esc(p.category) + '</span>' : '';
       var draftBadge = p.draft ? '<span class="badge badge-draft">草稿</span>' : '<span class="badge">已发布</span>';
+      var toggleLabel = p.draft ? '立即发布' : '转草稿';
       return (
         '<div class="post-row">' +
           thumb +
@@ -1920,6 +2349,7 @@
           '</div>' +
           '<div class="post-row-ops">' +
             '<button class="btn btn-soft btn-sm" type="button" data-edit-post="' + esc(p.slug) + '">编辑</button>' +
+            '<button class="btn btn-sm" type="button" data-toggle-draft="' + esc(p.slug) + '">' + toggleLabel + '</button>' +
             (p.draft ? '' : '<a class="btn btn-sm" href="/post/' + esc(p.slug) + '/" target="_blank">查看</a>') +
             '<button class="btn btn-danger btn-sm" type="button" data-del-post="' + esc(p.slug) + '" data-post-title="' + esc(p.title) + '">删除</button>' +
           '</div>' +
@@ -1928,13 +2358,28 @@
     }).join('');
   }
 
+  if (postsSearch) postsSearch.addEventListener('input', renderPosts);
+  if (postsCatFilter) postsCatFilter.addEventListener('change', renderPosts);
+  document.querySelectorAll('.filter-pill[data-post-status]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      state.postFilterStatus = btn.getAttribute('data-post-status') || 'all';
+      document.querySelectorAll('.filter-pill[data-post-status]').forEach(function (b) {
+        b.classList.toggle('is-active', b === btn);
+      });
+      renderPosts();
+    });
+  });
+
   postsList.addEventListener('click', function (e) {
     var editBtn = e.target.closest('[data-edit-post]');
     if (editBtn) {
+      if (!confirmDiscardDirty()) return;
       var slug = editBtn.getAttribute('data-edit-post');
       api('GET', '/api/studio/posts/' + encodeURIComponent(slug))
         .then(function (p) {
           state.editingSlug = p.slug;
+          state.dirty = false;
+          clearTimeout(state.draftTimer);
           fTitle.value = p.title || '';
           fSlug.value = p.slug || '';
           fSlug.readOnly = true;
@@ -1947,6 +2392,8 @@
           renderCats();
           fCat.value = p.category || '';
           syncCoverUI();
+          updateWordCount();
+          setSaveStatus('', false);
           editorModeLabel.textContent = '✏️ 编辑文章';
           editorSlugBadge.textContent = p.slug;
           editorSlugBadge.classList.remove('hidden');
@@ -1956,6 +2403,37 @@
           window.scrollTo({ top: 0, behavior: 'smooth' });
         })
         .catch(function (err) { showToast(esc(err.message), true); });
+      return;
+    }
+
+    var toggleBtn = e.target.closest('[data-toggle-draft]');
+    if (toggleBtn) {
+      var tSlug = toggleBtn.getAttribute('data-toggle-draft');
+      toggleBtn.disabled = true;
+      api('GET', '/api/studio/posts/' + encodeURIComponent(tSlug))
+        .then(function (p) {
+          var nextDraft = !p.draft;
+          return api('POST', '/api/studio/posts', {
+            title: p.title || '',
+            slug: p.slug,
+            date: p.date || todayStr(),
+            category: p.category || '',
+            tags: p.tags || '',
+            summary: p.summary || '',
+            cover: p.cover || '',
+            draft: nextDraft ? 'true' : 'false',
+            content: p.content || ''
+          }).then(function () { return nextDraft; });
+        })
+        .then(function (nextDraft) {
+          if (state.editingSlug === tSlug) fDraft.checked = nextDraft;
+          showToast(nextDraft ? '已转为草稿（前台已隐藏）✦' : '已发布到前台 ✦');
+          return refreshAll();
+        })
+        .catch(function (err) {
+          toggleBtn.disabled = false;
+          showToast(esc(err.message), true);
+        });
       return;
     }
 
@@ -2211,6 +2689,7 @@
         loginPass.value = '';
         showApp();
         resetEditor();
+        checkDraftRecovery();
         return refreshAll();
       });
     }).catch(function (err) {
@@ -2220,6 +2699,8 @@
   });
 
   document.getElementById('logout-btn').addEventListener('click', function () {
+    if (!confirmDiscardDirty()) return;
+    state.dirty = false;
     fetch('/api/studio/logout', { method: 'POST', credentials: 'same-origin' })
       .finally(function () { showGate(); });
   });
@@ -2230,6 +2711,7 @@
     .then(function () {
       showApp();
       resetEditor();
+      checkDraftRecovery();
     })
     .catch(function () {
       showGate();
