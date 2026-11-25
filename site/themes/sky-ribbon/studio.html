@@ -445,6 +445,11 @@
       border-color: transparent;
       color: var(--pink-fg);
     }
+    .tb-btn-vid {
+      background: var(--lilac-soft);
+      border-color: transparent;
+      color: var(--lilac-fg);
+    }
     .tb-spacer { flex: 1; }
     .md-split {
       display: grid;
@@ -478,6 +483,7 @@
       word-break: break-word;
     }
     .md-preview img { max-width: 100%; border-radius: 14px; display: block; margin: 12px auto; box-shadow: var(--shadow); }
+    .md-preview video { max-width: 100%; width: 100%; max-height: 360px; border-radius: 14px; display: block; margin: 12px auto; background: #0b1222; box-shadow: var(--shadow); }
     .md-preview pre { background: #152038; color: #e6f1ff; padding: 12px 14px; border-radius: 12px; overflow-x: auto; }
     .md-preview code { background: var(--sky-soft); color: var(--sky-fg); padding: 2px 6px; border-radius: 6px; font-size: 0.88em; }
     .md-preview pre code { background: transparent; color: inherit; padding: 0; }
@@ -680,11 +686,12 @@
       </div>
     </div>
 
-    <!-- Markdown + Image Editor -->
+    <!-- Markdown + Image/Video Editor -->
     <div class="field">
-      <label for="f-content">正文内容（Markdown 图文 · 支持点击插图、拖拽图片、Ctrl+V 粘贴截图）</label>
+      <label for="f-content">正文内容（Markdown 图文与视频 · 支持点击插图/插视频、直接拖入图片或视频、Ctrl+V 粘贴截图）</label>
       <div class="md-toolbar">
         <button id="tb-img" class="tb-btn tb-btn-img" type="button">🖼️ 插入图片</button>
+        <button id="tb-vid" class="tb-btn tb-btn-vid" type="button">🎬 插入视频</button>
         <button class="tb-btn" data-md="h2" type="button">H2 标题</button>
         <button class="tb-btn" data-md="bold" type="button"><b>B</b> 粗体</button>
         <button class="tb-btn" data-md="italic" type="button"><i>I</i> 斜体</button>
@@ -695,9 +702,10 @@
         <span id="img-status" class="field-hint"></span>
         <button id="tb-preview" class="tb-btn" type="button">👁️ 开启预览</button>
         <input id="inline-files" type="file" accept="image/*" multiple class="hidden">
+        <input id="inline-vid-file" type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg,.mp4,.webm,.mov,.ogg" class="hidden">
       </div>
       <div id="md-split" class="md-split">
-        <textarea id="f-content" class="md-area" placeholder="在这里写下今天的心情、故事和图文吧...&#10;&#10;小提示：直接拖入图片或粘贴截图即可自动上传并插入图文！"></textarea>
+        <textarea id="f-content" class="md-area" placeholder="在这里写下今天的心情、故事、插画和视频吧...&#10;&#10;小提示：直接拖入图片或 MP4/WebM 视频、粘贴截图即可自动上传并插入！"></textarea>
         <div id="md-preview" class="md-preview hidden"></div>
       </div>
     </div>
@@ -1495,18 +1503,115 @@
     if (state.previewOn) renderPreview();
   }
 
-  function uploadInlineFiles(fileList) {
-    var arr = Array.prototype.slice.call(fileList || []).filter(function (f) {
-      return f && f.type && f.type.indexOf('image/') === 0;
+  function isVideoFile(f) {
+    if (!f) return false;
+    if (f.type && f.type.indexOf('video/') === 0) return true;
+    return /\.(mp4|webm|mov|m4v|ogg|ogv)$/i.test(f.name || '');
+  }
+
+  function isVideoUrl(u) {
+    var path = String(u || '').split(/[?#]/)[0];
+    return /\.(mp4|webm|mov|m4v|ogg|ogv)$/i.test(path);
+  }
+
+  function captureVideoPoster(file) {
+    return new Promise(function (resolve) {
+      var done = false;
+      var finish = function (blob) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (objUrl) URL.revokeObjectURL(objUrl);
+        resolve(blob || null);
+      };
+      var objUrl = URL.createObjectURL(file);
+      var timer = setTimeout(function () { finish(null); }, 3000);
+      var v = document.createElement('video');
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = 'auto';
+      v.onloadeddata = function () {
+        try {
+          var target = (v.duration && isFinite(v.duration) && v.duration > 0.4) ? 0.25 : 0;
+          if (target > 0) v.currentTime = target;
+          else drawFrame();
+        } catch (_) { drawFrame(); }
+      };
+      v.onseeked = drawFrame;
+      v.onerror = function () { finish(null); };
+      function drawFrame() {
+        try {
+          var vw = v.videoWidth || 0;
+          var vh = v.videoHeight || 0;
+          if (!vw || !vh) { finish(null); return; }
+          var pw = Math.min(960, vw);
+          var ph = Math.round(vh * (pw / vw));
+          var c = renderScaledCanvas(v, 0, 0, vw, vh, pw, ph);
+          encodePreviewBlob(c, 0.80).then(finish, function () { finish(null); });
+        } catch (_) { finish(null); }
+      }
+      v.src = objUrl;
     });
+  }
+
+  function uploadVideoFile(file, onProgress) {
+    var MAX_VID = 104857600;
+    var CHUNK = 1048576; // 1 MiB chunk -> tiny server RAM + live progress bar
+    if (!file || !file.size) return Promise.reject(new Error('请选择有效的视频文件'));
+    if (file.size > MAX_VID) return Promise.reject(new Error('视频超过 100MB 限制，请适当压缩后再上传'));
+
+    var total = file.size;
+    var posterP = captureVideoPoster(file).then(function (b) {
+      return b ? uploadRawBlob(b).catch(function () { return ''; }) : '';
+    });
+
+    function sendChunk(offset, vidId) {
+      var end = Math.min(total, offset + CHUNK);
+      var isDone = end >= total ? 1 : 0;
+      var qs = '?done=' + isDone + (vidId ? ('&id=' + encodeURIComponent(vidId)) : '');
+      var slice = file.slice(offset, end);
+      return fetch('/api/studio/upload-video' + qs, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: slice
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (r.status === 401) { showGate(); throw new Error('登录已过期'); }
+          if (!r.ok) throw new Error(d.error || '视频上传失败');
+          if (onProgress) onProgress(end, total);
+          if (isDone) {
+            if (!d.url) throw new Error('视频上传完成但未返回地址');
+            return d.url;
+          }
+          if (!d.id) throw new Error('视频分片上传会话异常');
+          return sendChunk(end, d.id);
+        });
+      });
+    }
+
+    return Promise.all([sendChunk(0, ''), posterP]).then(function (res) {
+      var vidUrl = res[0];
+      var posterUrl = res[1];
+      return posterUrl ? (vidUrl + '?poster=' + posterUrl) : vidUrl;
+    });
+  }
+
+  function uploadInlineVideos(fileList) {
+    var arr = Array.prototype.slice.call(fileList || []).filter(isVideoFile);
     if (!arr.length) return;
-    imgStatus.textContent = '正在上传 ' + arr.length + ' 张图片...';
     var chain = Promise.resolve();
     var okCount = 0;
-    arr.forEach(function (file) {
+    arr.forEach(function (file, idx) {
       chain = chain.then(function () {
-        return uploadImageFile(file).then(function (url) {
-          var alt = (file.name || '图片').replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '') || '图片';
+        var mbAll = (file.size / 1048576).toFixed(1);
+        imgStatus.textContent = '🎬 正在上传视频 (' + (idx + 1) + '/' + arr.length + ') 0% · ' + mbAll + 'MB';
+        return uploadVideoFile(file, function (sent, total) {
+          var pct = Math.min(100, Math.round((sent / total) * 100));
+          var mbSent = (sent / 1048576).toFixed(1);
+          imgStatus.textContent = '🎬 上传视频中 ' + pct + '% (' + mbSent + ' / ' + mbAll + ' MB)...';
+        }).then(function (url) {
+          var alt = (file.name || '视频').replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '') || '视频';
           insertAtCursor('\n![' + alt + '](' + url + ')\n', '');
           okCount++;
         });
@@ -1514,8 +1619,8 @@
     });
     chain
       .then(function () {
-        imgStatus.textContent = '已插入 ' + okCount + ' 张图片 ✦';
-        showToast('已上传并插入 ' + okCount + ' 张图片 ✦');
+        imgStatus.textContent = '已插入 ' + okCount + ' 个视频 ✦';
+        showToast('视频已上传并插入文章，支持在线流畅播放 ✦');
       })
       .catch(function (err) {
         imgStatus.textContent = '';
@@ -1523,10 +1628,48 @@
       });
   }
 
+  function uploadInlineFiles(fileList) {
+    var all = Array.prototype.slice.call(fileList || []);
+    var imgs = all.filter(function (f) { return f && f.type && f.type.indexOf('image/') === 0; });
+    var vids = all.filter(isVideoFile);
+    if (imgs.length) {
+      imgStatus.textContent = '正在上传 ' + imgs.length + ' 张图片...';
+      var chain = Promise.resolve();
+      var okCount = 0;
+      imgs.forEach(function (file) {
+        chain = chain.then(function () {
+          return uploadImageFile(file).then(function (url) {
+            var alt = (file.name || '图片').replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '') || '图片';
+            insertAtCursor('\n![' + alt + '](' + url + ')\n', '');
+            okCount++;
+          });
+        });
+      });
+      chain
+        .then(function () {
+          imgStatus.textContent = '已插入 ' + okCount + ' 张图片 ✦';
+          showToast('已上传并插入 ' + okCount + ' 张图片 ✦');
+          if (vids.length) uploadInlineVideos(vids);
+        })
+        .catch(function (err) {
+          imgStatus.textContent = '';
+          showToast(esc(err.message), true);
+        });
+    } else if (vids.length) {
+      uploadInlineVideos(vids);
+    }
+  }
+
+  var inlineVidFile = document.getElementById('inline-vid-file');
   document.getElementById('tb-img').addEventListener('click', function () { inlineFiles.click(); });
+  document.getElementById('tb-vid').addEventListener('click', function () { inlineVidFile.click(); });
   inlineFiles.addEventListener('change', function () {
     uploadInlineFiles(inlineFiles.files);
     inlineFiles.value = '';
+  });
+  inlineVidFile.addEventListener('change', function () {
+    uploadInlineVideos(inlineVidFile.files);
+    inlineVidFile.value = '';
   });
 
   fContent.addEventListener('dragover', function (e) { e.preventDefault(); fContent.classList.add('is-drag'); });
@@ -1575,7 +1718,17 @@
   function mdInline(s) {
     var out = esc(s);
     out = out.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, url) {
-      return '<img src="' + esc(safeUrl(url)) + '" alt="' + alt + '">';
+      var su = safeUrl(url);
+      if (isVideoUrl(su)) {
+        var posterAttr = '';
+        try {
+          var u = new URL(su, window.location.origin);
+          var p = (u.searchParams.get('poster') || '').trim();
+          if (p && /^(https?:\/\/|\/)/i.test(p)) posterAttr = ' poster="' + esc(p) + '"';
+        } catch (_) {}
+        return '<video class="prose-video" src="' + esc(su) + '" title="' + alt + '"' + posterAttr + ' controls playsinline preload="metadata"></video>';
+      }
+      return '<img src="' + esc(su) + '" alt="' + alt + '">';
     });
     out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, txt, url) {
       return '<a href="' + esc(safeUrl(url)) + '" target="_blank">' + txt + '</a>';

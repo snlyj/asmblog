@@ -22,6 +22,8 @@ h_cookie:   .ascii "Cookie"
 .equ h_cookie_len, . - h_cookie
 h_xfp:      .ascii "X-Forwarded-Proto"
 .equ h_xfp_len, . - h_xfp
+h_range:    .ascii "Range"
+.equ h_range_len, . - h_range
 v_https:    .ascii "https"
 .equ v_https_len, . - v_https
 v_close:    .ascii "close"
@@ -46,6 +48,8 @@ resp_end:    .ascii "\r\n\r\n"
 st_200: .asciz "200 OK"
 .globl st_201
 st_201: .asciz "201 Created"
+.globl st_206
+st_206: .asciz "206 Partial Content"
 .globl st_304
 st_304: .asciz "304 Not Modified"
 .globl st_400
@@ -62,6 +66,8 @@ st_405: .asciz "405 Method Not Allowed"
 st_413: .asciz "413 Payload Too Large"
 .globl st_414
 st_414: .asciz "414 URI Too Long"
+.globl st_416
+st_416: .asciz "416 Range Not Satisfiable"
 .globl st_429
 st_429: .asciz "429 Too Many Requests"
 .globl st_500
@@ -390,7 +396,7 @@ http_parse_request:
     mov ecx, h_xfp_len
     call xslice_eq_ci
     test eax, eax
-    jz .Lh_pop_kv
+    jz .Lh_chk_range
     mov rdi, [rsp + 8]
     mov rsi, [rsp + 0]
     lea rdx, [rip + v_https]
@@ -399,6 +405,20 @@ http_parse_request:
     test eax, eax
     jz .Lh_pop_kv
     mov qword ptr [r14 + REQ_HTTPS], 1
+    jmp .Lh_pop_kv
+
+.Lh_chk_range:
+    mov rdi, [rsp + 24]
+    mov rsi, [rsp + 16]
+    lea rdx, [rip + h_range]
+    mov ecx, h_range_len
+    call xslice_eq_ci
+    test eax, eax
+    jz .Lh_pop_kv
+    mov rax, [rsp + 8]
+    mov [r14 + REQ_RANGE_PTR], rax
+    mov rax, [rsp + 0]
+    mov [r14 + REQ_RANGE_LEN], rax
 
 .Lh_pop_kv:
     add rsp, 32

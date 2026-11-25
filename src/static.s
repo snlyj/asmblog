@@ -8,11 +8,16 @@ st_dir_mid:     .ascii "/static/"
 .equ st_dir_mid_len, . - st_dir_mid
 up_dir_prefix:  .ascii "content/uploads/"
 .equ up_dir_prefix_len, . - up_dir_prefix
-etag_hdr_pre:       .ascii "\r\nCache-Control: public, max-age=0, must-revalidate\r\nETag: \""
+etag_hdr_pre:       .ascii "\r\nAccept-Ranges: bytes\r\nCache-Control: public, max-age=0, must-revalidate\r\nETag: \""
 .equ etag_hdr_pre_len, . - etag_hdr_pre
-etag_hdr_imm:       .ascii "\r\nCache-Control: public, max-age=31536000, immutable\r\nETag: \""
+etag_hdr_imm:       .ascii "\r\nAccept-Ranges: bytes\r\nCache-Control: public, max-age=31536000, immutable\r\nETag: \""
 .equ etag_hdr_imm_len, . - etag_hdr_imm
 etag_hdr_end:       .ascii "\""
+cr_hdr_pre:         .ascii "\r\nContent-Range: bytes "
+.equ cr_hdr_pre_len, . - cr_hdr_pre
+cr_hdr_416:         .ascii "\r\nContent-Range: bytes */"
+.equ cr_hdr_416_len, . - cr_hdr_416
+rng_bytes_pre:      .ascii "bytes="
 
 mime_css:       .asciz "text/css; charset=utf-8"
 mime_js:        .asciz "application/javascript; charset=utf-8"
@@ -25,6 +30,10 @@ mime_ico:       .asciz "image/x-icon"
 mime_woff2:     .asciz "font/woff2"
 mime_html:      .asciz "text/html; charset=utf-8"
 mime_json:      .asciz "application/json; charset=utf-8"
+mime_mp4:       .asciz "video/mp4"
+mime_webm:      .asciz "video/webm"
+mime_mov:       .asciz "video/quicktime"
+mime_ogg:       .asciz "video/ogg"
 mime_bin:       .asciz "application/octet-stream"
 
 ext_css:   .ascii ".css"
@@ -39,6 +48,12 @@ ext_ico:   .ascii ".ico"
 ext_woff2: .ascii ".woff2"
 ext_html:  .ascii ".html"
 ext_json:  .ascii ".json"
+ext_mp4:   .ascii ".mp4"
+ext_m4v:   .ascii ".m4v"
+ext_webm:  .ascii ".webm"
+ext_mov:   .ascii ".mov"
+ext_ogg:   .ascii ".ogg"
+ext_ogv:   .ascii ".ogv"
 
 fav_svg:
     .ascii "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><rect width=\"64\" height=\"64\" rx=\"14\" fill=\"#0f172a\"/><text x=\"32\" y=\"43\" font-family=\"monospace\" font-size=\"28\" font-weight=\"bold\" fill=\"#38bdf8\" text-anchor=\"middle\">0x</text></svg>"
@@ -46,6 +61,8 @@ fav_svg:
 
 msg_forbidden: .asciz "403 Forbidden"
 msg_notfound:  .asciz "404 Not Found"
+msg_416:       .ascii "416 Range Not Satisfiable"
+.equ msg_416_len, . - msg_416
 
 .section .text
 
@@ -99,6 +116,18 @@ mime_for_path:
     test eax, eax; jnz .Lm_html
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_json];  mov ecx, 5; call ends_with_ci
     test eax, eax; jnz .Lm_json
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_mp4];   mov ecx, 4; call ends_with_ci
+    test eax, eax; jnz .Lm_mp4
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_m4v];   mov ecx, 4; call ends_with_ci
+    test eax, eax; jnz .Lm_mp4
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_webm];  mov ecx, 5; call ends_with_ci
+    test eax, eax; jnz .Lm_webm
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_mov];   mov ecx, 4; call ends_with_ci
+    test eax, eax; jnz .Lm_mov
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_ogg];   mov ecx, 4; call ends_with_ci
+    test eax, eax; jnz .Lm_ogg
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_ogv];   mov ecx, 4; call ends_with_ci
+    test eax, eax; jnz .Lm_ogg
     lea rax, [rip + mime_bin]; jmp .Lm_ret
 .Lm_css:   lea rax, [rip + mime_css];   jmp .Lm_ret
 .Lm_js:    lea rax, [rip + mime_js];    jmp .Lm_ret
@@ -110,10 +139,121 @@ mime_for_path:
 .Lm_ico:   lea rax, [rip + mime_ico];   jmp .Lm_ret
 .Lm_woff2: lea rax, [rip + mime_woff2]; jmp .Lm_ret
 .Lm_html:  lea rax, [rip + mime_html];  jmp .Lm_ret
-.Lm_json:  lea rax, [rip + mime_json]
+.Lm_json:  lea rax, [rip + mime_json];  jmp .Lm_ret
+.Lm_mp4:   lea rax, [rip + mime_mp4];   jmp .Lm_ret
+.Lm_webm:  lea rax, [rip + mime_webm];  jmp .Lm_ret
+.Lm_mov:   lea rax, [rip + mime_mov];   jmp .Lm_ret
+.Lm_ogg:   lea rax, [rip + mime_ogg]
 .Lm_ret:
     pop r13
     pop r12
+    ret
+
+# parse_byte_range(rdi=hdr_ptr, rsi=hdr_len, rdx=file_size)
+#   -> eax: 0=ignore (serve 200), 1=valid 206 (rdx=start, rcx=end), -1=unsatisfiable (416)
+parse_byte_range:
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi
+    mov r13, rsi
+    mov r14, rdx
+
+    cmp r13, 7
+    jb .Lpbr_ignore
+    mov rdi, r12; mov esi, 6; lea rdx, [rip + rng_bytes_pre]; mov ecx, 6; call xslice_eq_ci
+    test eax, eax
+    jz .Lpbr_ignore
+    add r12, 6
+    sub r13, 6
+
+    # Multi-range (contains ',') -> fall back to full 200 OK
+    mov rdi, r12; mov rsi, r13; mov edx, ','; call xmemchr
+    cmp rax, -1
+    jne .Lpbr_ignore
+
+    # Locate '-'
+    mov rdi, r12; mov rsi, r13; mov edx, '-'; call xmemchr
+    cmp rax, -1
+    je .Lpbr_ignore
+    mov r15, rax
+
+    test r14, r14
+    jz .Lpbr_416
+
+    test r15, r15
+    jnz .Lpbr_has_start
+
+    # Suffix range: bytes=-N
+    lea rdi, [r12 + 1]
+    lea rsi, [r13 - 1]
+    call parse_uint
+    test edx, edx
+    jz .Lpbr_416
+    test rax, rax
+    jz .Lpbr_416
+    xor edx, edx
+    cmp rax, r14
+    jae .Lpbr_suf_ok
+    mov rdx, r14
+    sub rdx, rax
+.Lpbr_suf_ok:
+    lea rcx, [r14 - 1]
+    mov eax, 1
+    jmp .Lpbr_ret
+
+.Lpbr_has_start:
+    mov rdi, r12
+    mov rsi, r15
+    call parse_uint
+    test edx, edx
+    jz .Lpbr_ignore
+    mov rbx, rax
+    cmp rbx, r14
+    jae .Lpbr_416
+
+    lea rcx, [r15 + 1]
+    cmp rcx, r13
+    jae .Lpbr_open_end
+
+    lea rdi, [r12 + r15 + 1]
+    mov rsi, r13
+    sub rsi, r15
+    dec rsi
+    call parse_uint
+    test edx, edx
+    jz .Lpbr_ignore
+    cmp rax, rbx
+    jb .Lpbr_416
+    lea rcx, [r14 - 1]
+    cmp rax, rcx
+    jbe .Lpbr_set_end
+    mov rax, rcx
+.Lpbr_set_end:
+    mov rdx, rbx
+    mov rcx, rax
+    mov eax, 1
+    jmp .Lpbr_ret
+
+.Lpbr_open_end:
+    mov rdx, rbx
+    lea rcx, [r14 - 1]
+    mov eax, 1
+    jmp .Lpbr_ret
+
+.Lpbr_416:
+    mov eax, -1
+    jmp .Lpbr_ret
+.Lpbr_ignore:
+    xor eax, eax
+.Lpbr_ret:
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
     ret
 
 # handle_favicon(rdi=conn, rsi=&req)
@@ -147,11 +287,11 @@ serve_file_common:
     push r13
     push r14
     push r15
-    sub rsp, 1272         # [rsp+1256] = mode
+    sub rsp, 1400         # [rsp+1368]=mode, [rsp+1376]=rng_start, [rsp+1384]=rng_len, [rsp+1392]=rng_end
 
     mov r12, rdi
     mov r13, rsi
-    mov [rsp + 1256], rdx
+    mov [rsp + 1368], rdx
 
     # URL-decode param first (so %2e%2e traversal is caught!)
     lea rdi, [rsp + 24]
@@ -175,7 +315,7 @@ serve_file_common:
     mov edx, 511
     call sb_init
 
-    cmp qword ptr [rsp + 1256], 0
+    cmp qword ptr [rsp + 1368], 0
     jne .Lst_path_up
 
     lea rdi, [rsp + 0]
@@ -236,9 +376,9 @@ serve_file_common:
     # Use long-term immutable cache for uploads (mode==1) or versioned URLs (?v=...)
     lea rdi, [rsp + 48]
     lea rsi, [rsp + 1048]
-    mov edx, 159
+    mov edx, 287
     call sb_init
-    cmp qword ptr [rsp + 1256], 0
+    cmp qword ptr [rsp + 1368], 0
     jne .Lst_cc_imm
     cmp qword ptr [r13 + REQ_QUERY_LEN], 0
     jnz .Lst_cc_imm
@@ -302,6 +442,68 @@ serve_file_common:
     call mime_for_path
     mov rbx, rax
 
+    # Check HTTP Range header for video/media streaming (206 Partial Content / 416)
+    cmp qword ptr [r13 + REQ_RANGE_PTR], 0
+    je .Lst_send_200
+    mov rdi, [r13 + REQ_RANGE_PTR]
+    mov rsi, [r13 + REQ_RANGE_LEN]
+    mov rdx, r15
+    call parse_byte_range
+    test eax, eax
+    jz .Lst_send_200
+    js .Lst_send_416
+
+    # 206 Partial Content: start=rdx, end=rcx
+    mov [rsp + 1376], rdx
+    mov [rsp + 1392], rcx
+    sub rcx, rdx
+    inc rcx
+    mov [rsp + 1384], rcx
+
+    # Append Content-Range: bytes <start>-<end>/<size> onto extra headers buffer
+    dec qword ptr [rsp + 48 + SB_LEN]
+    lea rdi, [rsp + 48]; lea rsi, [rip + cr_hdr_pre]; mov edx, cr_hdr_pre_len; call sb_mem
+    lea rdi, [rsp + 48]; mov rsi, [rsp + 1376]; call sb_uint
+    lea rdi, [rsp + 48]; mov esi, '-'; call sb_byte
+    lea rdi, [rsp + 48]; mov rsi, [rsp + 1392]; call sb_uint
+    lea rdi, [rsp + 48]; mov esi, '/'; call sb_byte
+    lea rdi, [rsp + 48]; mov rsi, r15; call sb_uint
+    lea rdi, [rsp + 48]; xor esi, esi; call sb_byte
+
+    mov rdi, r12
+    lea rsi, [rip + st_206]
+    mov rdx, rbx
+    xor ecx, ecx
+    mov r8, [rsp + 1384]
+    lea r9, [rsp + 1048]
+    call http_send_resp
+
+    cmp qword ptr [r12 + CONN_IS_HEAD], 0
+    jne .Lst_close_ok
+    mov [r12 + CONN_FILE_FD], r14
+    mov rax, [rsp + 1376]
+    mov [r12 + CONN_FILE_OFF], rax
+    mov rax, [rsp + 1384]
+    mov [r12 + CONN_FILE_REM], rax
+    jmp .Lst_done
+
+.Lst_send_416:
+    mov rdi, r14
+    call sys_close
+    lea rdi, [rsp + 48]; lea rsi, [rsp + 1048]; mov edx, 287; call sb_init
+    lea rdi, [rsp + 48]; lea rsi, [rip + cr_hdr_416]; mov edx, cr_hdr_416_len; call sb_mem
+    lea rdi, [rsp + 48]; mov rsi, r15; call sb_uint
+    lea rdi, [rsp + 48]; xor esi, esi; call sb_byte
+    mov rdi, r12
+    lea rsi, [rip + st_416]
+    lea rdx, [rip + ct_txt]
+    lea rcx, [rip + msg_416]
+    mov r8d, msg_416_len
+    lea r9, [rsp + 1048]
+    call http_send_resp
+    jmp .Lst_done
+
+.Lst_send_200:
     mov rdi, r12
     lea rsi, [rip + st_200]
     mov rdx, rbx
@@ -342,7 +544,7 @@ serve_file_common:
     call http_send_error
 
 .Lst_done:
-    add rsp, 1272
+    add rsp, 1400
     pop r15
     pop r14
     pop r13

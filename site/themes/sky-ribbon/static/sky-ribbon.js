@@ -588,6 +588,36 @@
     });
   }
 
+  function enhanceVideos() {
+    document.querySelectorAll('.prose video.prose-video').forEach(function (vid) {
+      if (vid.dataset.vidEnhanced) return;
+      vid.dataset.vidEnhanced = '1';
+      var rawSrc = vid.getAttribute('src') || '';
+      if (rawSrc) {
+        try {
+          var u = new URL(rawSrc, window.location.origin);
+          var poster = (u.searchParams.get('poster') || '').trim();
+          if (poster && (poster.indexOf('/') === 0 || /^https?:\/\//i.test(poster))) {
+            vid.setAttribute('poster', poster);
+          }
+        } catch (_) {}
+      }
+      var title = (vid.getAttribute('title') || '').trim();
+      if (title.length >= 2 && !/\.(mp4|webm|mov|m4v|ogg|ogv)$/i.test(title) && !/^(video|clip|视频)$/i.test(title)) {
+        if (!vid.closest('figure')) {
+          var fig = document.createElement('figure');
+          fig.className = 'prose-video-fig';
+          var cap = document.createElement('figcaption');
+          cap.className = 'prose-cap';
+          cap.textContent = '🎬 ' + title;
+          vid.parentNode.insertBefore(fig, vid);
+          fig.appendChild(vid);
+          fig.appendChild(cap);
+        }
+      }
+    });
+  }
+
   function animateStageCards() {
     if (reducedMotion || !stage) return;
     var items = stage.querySelectorAll('.reveal');
@@ -1017,6 +1047,7 @@
   function hydratePage(animate) {
     if (animate) animateStageCards();
     enhanceImages();
+    enhanceVideos();
     enhanceCodeBlocks();
     initArticleExtras();
     initArchiveYears();
@@ -1085,6 +1116,7 @@
 
   function smoothNavigate(urlObj, push) {
     closeLightbox();
+    document.querySelectorAll('video').forEach(function (v) { try { v.pause(); } catch (_) {} });
     if (!stage || isNavigating) {
       window.location.href = urlObj.href;
       return;

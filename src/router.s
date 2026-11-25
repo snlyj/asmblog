@@ -50,6 +50,8 @@ pat_st_cats_del:   .ascii "/api/studio/categories/delete"
 .equ pat_st_cats_del_len, . - pat_st_cats_del
 pat_st_upload:     .ascii "/api/studio/upload"
 .equ pat_st_upload_len, . - pat_st_upload
+pat_st_up_vid:     .ascii "/api/studio/upload-video"
+.equ pat_st_up_vid_len, . - pat_st_up_vid
 pat_st_settings:   .ascii "/api/studio/settings"
 .equ pat_st_settings_len, . - pat_st_settings
 
@@ -79,7 +81,8 @@ route_table:
     .quad METH_GET,    pat_st_cats,     pat_st_cats_len,     handle_studio_cats_list,   0
     .quad METH_POST,   pat_st_cats,     pat_st_cats_len,     handle_studio_cat_add,     0
     .quad METH_POST,   pat_st_cats_del, pat_st_cats_del_len, handle_studio_cat_del,     0
-    .quad METH_POST,   pat_st_upload,   pat_st_upload_len,   handle_studio_upload,      0
+    .quad METH_POST,   pat_st_upload,   pat_st_upload_len,   handle_studio_upload,       0
+    .quad METH_POST,   pat_st_up_vid,   pat_st_up_vid_len,   handle_studio_upload_video, 0
     .quad METH_GET,    pat_st_settings, pat_st_settings_len, handle_studio_settings_get, 0
     .quad METH_POST,   pat_st_settings, pat_st_settings_len, handle_studio_settings_save, 0
     .quad 0, 0, 0, 0, 0

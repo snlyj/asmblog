@@ -187,6 +187,8 @@
 .equ REQ_CONTENT_LEN,       136       # u64
 .equ REQ_PEER_IP,           144       # u32
 .equ REQ_HTTPS,             152       # u64 (1 if X-Forwarded-Proto: https)
+.equ REQ_RANGE_PTR,         160       # Range header value (e.g. "bytes=0-1023")
+.equ REQ_RANGE_LEN,         168
 .equ REQ_SIZE,              256
 
 # --- post_t (320 bytes) ---

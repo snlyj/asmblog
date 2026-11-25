@@ -6,6 +6,7 @@
 .equ MAX_SESSIONS,   16
 .equ SESS_SIZE,      72       # 64-byte ASCII hex token + 8-byte monotonic expire sec
 .equ SESS_TTL_SEC,   2592000  # 30 days
+.equ MAX_VIDEO_BYTES, 104857600  # 100 MiB max chunked video upload
 
 .section .bss
 .align 8
@@ -141,6 +142,8 @@ j_ok_slug_1:    .ascii "{\"ok\":true,\"slug\":\""
 .equ j_ok_slug_1_len, . - j_ok_slug_1
 j_ok_url_1:     .ascii "{\"ok\":true,\"url\":\"/uploads/"
 .equ j_ok_url_1_len, . - j_ok_url_1
+j_ok_id_1:      .ascii "{\"ok\":true,\"id\":\""
+.equ j_ok_id_1_len, . - j_ok_id_1
 j_ok_spath_1:   .ascii "{\"ok\":true,\"studio_path\":\""
 .equ j_ok_spath_1_len, . - j_ok_spath_1
 j_close_obj:    .ascii "\"}"
@@ -180,6 +183,12 @@ j_err_imgsize:  .ascii "{\"error\":\"图片大小无效（最大约 3.8MB）\"}"
 .equ j_err_imgsize_len, . - j_err_imgsize
 j_err_imgtype:  .ascii "{\"error\":\"仅支持 JPG / PNG / GIF / WebP 图片\"}"
 .equ j_err_imgtype_len, . - j_err_imgtype
+j_err_vidtype:  .ascii "{\"error\":\"仅支持 MP4 / WebM / MOV / OGG 视频\"}"
+.equ j_err_vidtype_len, . - j_err_vidtype
+j_err_vidsize:  .ascii "{\"error\":\"视频大小超过 100MB 限制或分片无效\"}"
+.equ j_err_vidsize_len, . - j_err_vidsize
+j_err_vidid:    .ascii "{\"error\":\"无效的视频上传会话，请重试\"}"
+.equ j_err_vidid_len, . - j_err_vidid
 st_msg_404:     .asciz "404 Not Found"
 
 # JSON serialization fragments
@@ -316,11 +325,19 @@ st_p_up_dot:    .ascii "content/uploads/."
 .equ st_p_up_dot_len, . - st_p_up_dot
 st_p_tmp_suf:   .ascii ".tmp"
 .equ st_p_tmp_suf_len, . - st_p_tmp_suf
+st_p_part_suf:  .ascii ".part"
+.equ st_p_part_suf_len, . - st_p_part_suf
+qk_id:          .ascii "id"
+qk_done:        .ascii "done"
 
 ext_jpg_s:      .ascii ".jpg"
 ext_png_s:      .ascii ".png"
 ext_gif_s:      .ascii ".gif"
 ext_webp_s:     .ascii ".webp"
+ext_mp4_s:      .ascii ".mp4"
+ext_webm_s:     .ascii ".webm"
+ext_mov_s:      .ascii ".mov"
+ext_ogg_s:      .ascii ".ogg"
 
 .section .text
 
@@ -1857,6 +1874,294 @@ handle_studio_upload:
     pop r13
     pop r12
     pop rbx
+    ret
+
+# is_safe_vid_id(rdi=ptr, rsi=len) -> eax=1 if safe video upload id (no traversal, valid video ext)
+is_safe_vid_id:
+    push rbx
+    push r12
+    push r13
+    mov r12, rdi
+    mov r13, rsi
+    cmp r13, 10
+    jb .Lsvi_no
+    cmp r13, 64
+    ja .Lsvi_no
+    xor ebx, ebx
+.Lsvi_loop:
+    cmp rbx, r13
+    jae .Lsvi_ext
+    movzx eax, byte ptr [r12 + rbx]
+    cmp al, '0'
+    jb .Lsvi_chk_sym
+    cmp al, '9'
+    jbe .Lsvi_next
+.Lsvi_chk_sym:
+    cmp al, 'a'
+    jb .Lsvi_chk_dash
+    cmp al, 'z'
+    jbe .Lsvi_next
+.Lsvi_chk_dash:
+    cmp al, '-'
+    je .Lsvi_next
+    cmp al, '.'
+    jne .Lsvi_no
+    # Reject leading dot or consecutive ".."
+    test rbx, rbx
+    jz .Lsvi_no
+    cmp byte ptr [r12 + rbx - 1], '.'
+    je .Lsvi_no
+.Lsvi_next:
+    inc rbx
+    jmp .Lsvi_loop
+.Lsvi_ext:
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + ext_mp4_s]; mov ecx, 4; call xslice_eq
+    test eax, eax; jnz .Lsvi_yes
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + ext_mov_s]; mov ecx, 4; call xslice_eq
+    test eax, eax; jnz .Lsvi_yes
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + ext_ogg_s]; mov ecx, 4; call xslice_eq
+    test eax, eax; jnz .Lsvi_yes
+    lea rdi, [r12 + r13 - 5]; mov esi, 5; lea rdx, [rip + ext_webm_s]; mov ecx, 5; call xslice_eq
+    test eax, eax; jnz .Lsvi_yes
+.Lsvi_no:
+    xor eax, eax
+    jmp .Lsvi_ret
+.Lsvi_yes:
+    mov eax, 1
+.Lsvi_ret:
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
+# =========================================================================
+# 11b. POST /api/studio/upload-video (chunked streaming video upload <= 100 MiB)
+#   Query: ?done=1 (finalize) and optional ?id=<fname> (append chunk)
+# =========================================================================
+.globl handle_studio_upload_video
+handle_studio_upload_video:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 216          # [0..23]=sbuf, [24]=ext_ptr, [32]=ext_len, [40]=fname_len, [48]=done, [56]=fd, [64..207]=stat
+    mov r12, rdi
+    mov r13, rsi
+
+    mov rdi, r13
+    call studio_is_authed
+    test eax, eax
+    jnz .Lhsuv_chk_sz
+    mov rdi, r12; lea rsi, [rip + st_401]; lea rdx, [rip + j_err_unauth]; mov ecx, j_err_unauth_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsuv_ret
+
+.Lhsuv_chk_sz:
+    mov r14, [r13 + REQ_BODY_PTR]
+    mov r15, [r13 + REQ_BODY_LEN]
+    test r15, r15
+    jz .Lhsuv_badsize
+    cmp r15, MAX_BODY_BYTES
+    ja .Lhsuv_badsize
+
+    # Parse ?done=1
+    mov qword ptr [rsp + 48], 0
+    mov rdi, rsp; lea rsi, [rip + st_f_draft]; mov edx, 15; call sb_init
+    mov rdi, r13; lea rsi, [rip + qk_done]; mov edx, 4; mov rcx, rsp; call http_query_get
+    cmp qword ptr [rsp + SB_LEN], 1
+    jne .Lhsuv_get_id
+    cmp byte ptr [rip + st_f_draft], '1'
+    jne .Lhsuv_get_id
+    mov qword ptr [rsp + 48], 1
+
+.Lhsuv_get_id:
+    mov rdi, rsp; lea rsi, [rip + st_f_slug]; mov edx, 127; call sb_init
+    mov rdi, r13; lea rsi, [rip + qk_id]; mov edx, 2; mov rcx, rsp; call http_query_get
+    mov rbx, [rsp + SB_LEN]
+    test rbx, rbx
+    jnz .Lhsuv_append
+
+    # --- Chunk 0: verify video magic bytes ---
+    cmp r15, 12
+    jb .Lhsuv_badtype
+    # MP4 / MOV: bytes[4..7] == "ftyp" (0x70797466)
+    cmp dword ptr [r14 + 4], 0x70797466
+    jne .Lhsuv_chk_webm
+    cmp dword ptr [r14 + 8], 0x20207471       # "qt  " -> QuickTime .mov
+    je .Lhsuv_is_mov
+    lea rax, [rip + ext_mp4_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 4
+    jmp .Lhsuv_newfile
+.Lhsuv_is_mov:
+    lea rax, [rip + ext_mov_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 4
+    jmp .Lhsuv_newfile
+
+.Lhsuv_chk_webm:
+    # WebM / MKV EBML header: 1A 45 DF A3
+    cmp dword ptr [r14 + 0], 0xa3df451a
+    jne .Lhsuv_chk_ogg
+    lea rax, [rip + ext_webm_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 5
+    jmp .Lhsuv_newfile
+
+.Lhsuv_chk_ogg:
+    # OGG / OGV header: "OggS"
+    cmp dword ptr [r14 + 0], 0x5367674f
+    jne .Lhsuv_badtype
+    lea rax, [rip + ext_ogg_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 4
+
+.Lhsuv_newfile:
+    lea rdi, [rip + st_d_content]; mov esi, 0755; call sys_mkdir
+    lea rdi, [rip + st_d_uploads]; mov esi, 0755; call sys_mkdir
+
+    lea rdi, [rip + st_rand_buf]; mov esi, 4; xor edx, edx; call sys_getrandom
+    cmp rax, 4
+    je .Lhsuv_mkname
+    call mono_sec
+    mov [rip + st_rand_buf], eax
+.Lhsuv_mkname:
+    call real_sec
+    mov rbx, rax
+    mov rdi, rsp; lea rsi, [rip + st_f_slug]; mov edx, 127; call sb_init
+    mov rdi, rsp; mov rsi, rbx; call sb_uint
+    mov rdi, rsp; mov esi, '-'; call sb_byte
+    mov rdi, rsp; lea rsi, [rip + st_rand_buf]; mov edx, 4; call sb_hex
+    mov rdi, rsp; mov rsi, [rsp + 24]; mov rdx, [rsp + 32]; call sb_mem
+    mov rax, [rsp + SB_LEN]
+    mov [rsp + 40], rax
+
+    # Build final path & hidden .part path
+    mov rdi, rsp; lea rsi, [rip + st_path_buf]; mov edx, 511; call sb_init
+    mov rdi, rsp; lea rsi, [rip + st_p_up_pre]; mov edx, st_p_up_pre_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + st_f_slug]; mov rdx, [rsp + 40]; call sb_mem
+    mov rdi, rsp; xor esi, esi; call sb_byte
+
+    mov rdi, rsp; lea rsi, [rip + st_tmp_buf]; mov edx, 511; call sb_init
+    mov rdi, rsp; lea rsi, [rip + st_p_up_dot]; mov edx, st_p_up_dot_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + st_f_slug]; mov rdx, [rsp + 40]; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + st_p_part_suf]; mov edx, st_p_part_suf_len; call sb_mem
+    mov rdi, rsp; xor esi, esi; call sb_byte
+
+    mov rdi, AT_FDCWD
+    lea rsi, [rip + st_tmp_buf]
+    mov edx, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC
+    mov ecx, 0644
+    call sys_openat
+    test rax, rax
+    js .Lhsuv_wrerr
+    mov [rsp + 56], rax
+    mov rdi, rax; mov rsi, r14; mov rdx, r15; call write_all
+    push rax
+    mov rdi, [rsp + 64]; call sys_close
+    pop rax
+    test rax, rax
+    js .Lhsuv_unlink_err
+    jmp .Lhsuv_finish
+
+.Lhsuv_append:
+    lea rdi, [rip + st_f_slug]
+    mov rsi, rbx
+    call is_safe_vid_id
+    test eax, eax
+    jz .Lhsuv_badid
+    mov [rsp + 40], rbx
+
+    mov rdi, rsp; lea rsi, [rip + st_path_buf]; mov edx, 511; call sb_init
+    mov rdi, rsp; lea rsi, [rip + st_p_up_pre]; mov edx, st_p_up_pre_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + st_f_slug]; mov rdx, [rsp + 40]; call sb_mem
+    mov rdi, rsp; xor esi, esi; call sb_byte
+
+    mov rdi, rsp; lea rsi, [rip + st_tmp_buf]; mov edx, 511; call sb_init
+    mov rdi, rsp; lea rsi, [rip + st_p_up_dot]; mov edx, st_p_up_dot_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + st_f_slug]; mov rdx, [rsp + 40]; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + st_p_part_suf]; mov edx, st_p_part_suf_len; call sb_mem
+    mov rdi, rsp; xor esi, esi; call sb_byte
+
+    mov rdi, AT_FDCWD
+    lea rsi, [rip + st_tmp_buf]
+    mov edx, O_WRONLY | O_APPEND | O_NOFOLLOW | O_CLOEXEC
+    xor ecx, ecx
+    call sys_openat
+    test rax, rax
+    js .Lhsuv_badid
+    mov [rsp + 56], rax
+
+    mov rdi, rax
+    lea rsi, [rsp + 64]
+    call sys_fstat
+    test rax, rax
+    js .Lhsuv_close_wrerr
+    mov rax, [rsp + 64 + STAT_SIZE]
+    add rax, r15
+    cmp rax, MAX_VIDEO_BYTES
+    ja .Lhsuv_too_big
+
+    mov rdi, [rsp + 56]; mov rsi, r14; mov rdx, r15; call write_all
+    push rax
+    mov rdi, [rsp + 64]; call sys_close
+    pop rax
+    test rax, rax
+    js .Lhsuv_wrerr
+
+.Lhsuv_finish:
+    cmp qword ptr [rsp + 48], 0
+    je .Lhsuv_more
+
+    lea rdi, [rip + st_tmp_buf]
+    lea rsi, [rip + st_path_buf]
+    call sys_rename
+    test rax, rax
+    js .Lhsuv_unlink_err
+
+    mov rdi, rsp; lea rsi, [rip + st_resp_buf]; mov edx, 511; call sb_init
+    mov rdi, rsp; lea rsi, [rip + j_ok_url_1]; mov edx, j_ok_url_1_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + st_f_slug]; mov rdx, [rsp + 40]; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + j_close_obj]; mov edx, j_close_obj_len; call sb_mem
+    mov rdi, r12; lea rsi, [rip + st_200]; lea rdx, [rip + st_resp_buf]; mov rcx, [rsp + SB_LEN]; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsuv_ret
+
+.Lhsuv_more:
+    mov rdi, rsp; lea rsi, [rip + st_resp_buf]; mov edx, 511; call sb_init
+    mov rdi, rsp; lea rsi, [rip + j_ok_id_1]; mov edx, j_ok_id_1_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + st_f_slug]; mov rdx, [rsp + 40]; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + j_close_obj]; mov edx, j_close_obj_len; call sb_mem
+    mov rdi, r12; lea rsi, [rip + st_200]; lea rdx, [rip + st_resp_buf]; mov rcx, [rsp + SB_LEN]; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsuv_ret
+
+.Lhsuv_too_big:
+    mov rdi, [rsp + 56]; call sys_close
+    lea rdi, [rip + st_tmp_buf]; call sys_unlink
+.Lhsuv_badsize:
+    mov rdi, r12; lea rsi, [rip + st_400]; lea rdx, [rip + j_err_vidsize]; mov ecx, j_err_vidsize_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsuv_ret
+.Lhsuv_badtype:
+    mov rdi, r12; lea rsi, [rip + st_400]; lea rdx, [rip + j_err_vidtype]; mov ecx, j_err_vidtype_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsuv_ret
+.Lhsuv_badid:
+    mov rdi, r12; lea rsi, [rip + st_400]; lea rdx, [rip + j_err_vidid]; mov ecx, j_err_vidid_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsuv_ret
+.Lhsuv_close_wrerr:
+    mov rdi, [rsp + 56]; call sys_close
+    jmp .Lhsuv_wrerr
+.Lhsuv_unlink_err:
+    lea rdi, [rip + st_tmp_buf]; call sys_unlink
+.Lhsuv_wrerr:
+    mov rdi, r12; lea rsi, [rip + st_500]; lea rdx, [rip + j_err_write]; mov ecx, j_err_write_len; xor r8d, r8d
+    call studio_send_json
+.Lhsuv_ret:
+    add rsp, 216
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
     ret
 
 # =========================================================================

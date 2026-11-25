@@ -306,19 +306,19 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v12 = http_req("/static/sky-ribbon.css?v=12")
+        st_imm, hdrs_imm, css_v13 = http_req("/static/sky-ribbon.css?v=13")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v12)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v13)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
-        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".pjax-loader", b".post-grid", b".toc-desktop", b".toc-mobile", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
+        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".toc-desktop", b".toc-mobile", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
             assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v12 = http_req("/static/sky-ribbon.js?v=12")
+        st_js, _, js_v13 = http_req("/static/sky-ribbon.js?v=13")
         assert_eq(st_js, 200, "versioned static js 200")
-        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText"):
-            assert required_js in js_v12, f"missing expected UI JS feature: {required_js!r}"
+        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"enhanceVideos", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText"):
+            assert required_js in js_v13, f"missing expected UI JS feature: {required_js!r}"
 
         # Open Graph / Twitter Card social preview meta + zero-bloat Giscus hidden by default
         assert 'property="og:type" content="website"' in home_txt
@@ -533,6 +533,73 @@ def test_server():
         assert_eq(img_bytes, tiny_png, "uploaded PNG bytes match")
         assert "image/png" in img_hdrs.get("Content-Type", "")
         assert "immutable" in img_hdrs.get("Cache-Control", "")
+        assert img_hdrs.get("Accept-Ranges") == "bytes", f"missing Accept-Ranges: {img_hdrs}"
+
+        # Chunked video upload: reject fake non-video & path traversal IDs
+        st_fv, _, _ = http_req(
+            "/api/studio/upload-video?done=1",
+            method="POST",
+            headers={**cookie_hdr, "Content-Type": "application/octet-stream"},
+            data=b"not a valid video file header!",
+        )
+        assert_eq(st_fv, 400, "fake video must be rejected")
+        st_tv, _, _ = http_req(
+            "/api/studio/upload-video?id=../evil.mp4&done=1",
+            method="POST",
+            headers={**cookie_hdr, "Content-Type": "application/octet-stream"},
+            data=b"1234",
+        )
+        assert_eq(st_tv, 400, "traversal video id must be rejected")
+
+        # Valid 2-chunk MP4 upload (ISO BMFF ftyp header + second chunk)
+        vid_c1 = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + (b"A" * 64)
+        vid_c2 = b"B" * 40
+        vid_all = vid_c1 + vid_c2
+        st_v1, _, vb1 = http_req(
+            "/api/studio/upload-video?done=0",
+            method="POST",
+            headers={**cookie_hdr, "Content-Type": "application/octet-stream"},
+            data=vid_c1,
+        )
+        assert_eq(st_v1, 200, "video chunk 1 ok")
+        vid_id = json.loads(vb1)["id"]
+        assert vid_id.endswith(".mp4"), f"unexpected vid_id: {vid_id}"
+        st_v2, _, vb2 = http_req(
+            f"/api/studio/upload-video?id={vid_id}&done=1",
+            method="POST",
+            headers={**cookie_hdr, "Content-Type": "application/octet-stream"},
+            data=vid_c2,
+        )
+        assert_eq(st_v2, 200, "video chunk 2 finalize ok")
+        vid_url = json.loads(vb2)["url"]
+        assert_eq(vid_url, f"/uploads/{vid_id}", "final video url")
+        temp_files.append(os.path.join(SITE, "content", vid_url.lstrip("/")))
+
+        # Verify video MIME + full 200 + RFC 9110 Range 206 Partial Content + 416
+        st_vf, vh_f, vb_f = http_req(vid_url)
+        assert_eq(st_vf, 200, "GET video 200")
+        assert_eq(vb_f, vid_all, "full video bytes match")
+        assert "video/mp4" in vh_f.get("Content-Type", ""), f"bad video mime: {vh_f}"
+        assert vh_f.get("Accept-Ranges") == "bytes"
+
+        st_r1, hr1, br1 = http_req(vid_url, headers={"Range": "bytes=0-15"})
+        assert_eq(st_r1, 206, "Range 0-15 -> 206")
+        assert_eq(br1, vid_all[:16], "Range 0-15 bytes")
+        assert_eq(hr1.get("Content-Range"), f"bytes 0-15/{len(vid_all)}", "Content-Range 0-15")
+
+        st_r2, hr2, br2 = http_req(vid_url, headers={"Range": "bytes=20-"})
+        assert_eq(st_r2, 206, "Range 20- -> 206")
+        assert_eq(br2, vid_all[20:], "Range 20- bytes")
+        assert_eq(hr2.get("Content-Range"), f"bytes 20-{len(vid_all)-1}/{len(vid_all)}", "Content-Range 20-")
+
+        st_r3, hr3, br3 = http_req(vid_url, headers={"Range": "bytes=-10"})
+        assert_eq(st_r3, 206, "Range -10 -> 206")
+        assert_eq(br3, vid_all[-10:], "Range -10 bytes")
+        assert_eq(hr3.get("Content-Range"), f"bytes {len(vid_all)-10}-{len(vid_all)-1}/{len(vid_all)}", "Content-Range -10")
+
+        st_r4, hr4, _ = http_req(vid_url, headers={"Range": "bytes=999999-"})
+        assert_eq(st_r4, 416, "Out-of-bounds Range -> 416")
+        assert_eq(hr4.get("Content-Range"), f"bytes */{len(vid_all)}", "Content-Range 416")
 
         # Add custom category
         st_ca, _, _ = http_req(
@@ -545,7 +612,7 @@ def test_server():
         cats = json.loads(http_req("/api/studio/categories", headers=cookie_hdr)[2])
         assert any(c["name"] == "测试相册" for c in cats), f"new category missing: {cats}"
 
-        # Publish post with cover + category + inline uploaded image
+        # Publish post with cover + category + inline uploaded image + inline uploaded video
         post_payload = {
             "title": "测试图文日记",
             "slug": "studio-e2e-demo",
@@ -555,7 +622,7 @@ def test_server():
             "summary": "一篇带封面图与正文插图的测试文章",
             "cover": up_url,
             "draft": "false",
-            "content": f"## 图文测试\n\n这里是一张插图：\n\n![可爱插图]({up_url})\n",
+            "content": f"## 图文测试\n\n这里是一张插图：\n\n![可爱插图]({up_url})\n\n这里是一段视频：\n\n![精彩片段]({vid_url}?poster={up_url})\n",
         }
         st_sp, _, sp_body = http_req(
             "/api/studio/posts",
@@ -566,11 +633,12 @@ def test_server():
         assert_eq(st_sp, 200, "publish studio post")
         assert_eq(json.loads(sp_body)["slug"], "studio-e2e-demo")
 
-        # Verify public rendering on post detail and category page
+        # Verify public rendering on post detail and category page (including HTML5 <video>)
         st_vp, _, vp_html = http_req("/post/studio-e2e-demo/")
         assert_eq(st_vp, 200, "public view of studio post")
         vp_txt = vp_html.decode("utf-8")
         assert "测试图文日记" in vp_txt and f'src="{up_url}"' in vp_txt and "测试相册" in vp_txt
+        assert f'<video class="prose-video" src="{vid_url}?poster={up_url}" title="精彩片段" controls playsinline preload="metadata"></video>' in vp_txt, "HTML5 video tag missing"
 
         st_vc, _, vc_html = http_req("/category/" + urllib.parse.quote("测试相册") + "/")
         assert_eq(st_vc, 200, "new category page")

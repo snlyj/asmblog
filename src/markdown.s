@@ -52,6 +52,19 @@ tag_a_c:        .ascii "</a>"
 tag_img_o:      .ascii "<img src=\""
 tag_img_m:      .ascii "\" alt=\""
 tag_img_c:      .ascii "\" loading=\"lazy\">"
+tag_vid_o:      .ascii "<video class=\"prose-video\" src=\""
+.equ tag_vid_o_len, . - tag_vid_o
+tag_vid_m:      .ascii "\" title=\""
+.equ tag_vid_m_len, . - tag_vid_m
+tag_vid_c:      .ascii "\" controls playsinline preload=\"metadata\"></video>"
+.equ tag_vid_c_len, . - tag_vid_c
+
+vext_mp4:       .ascii ".mp4"
+vext_m4v:       .ascii ".m4v"
+vext_webm:      .ascii ".webm"
+vext_mov:       .ascii ".mov"
+vext_ogg:       .ascii ".ogg"
+vext_ogv:       .ascii ".ogv"
 
 sch_http:       .ascii "http://"
 sch_https:      .ascii "https://"
@@ -457,6 +470,49 @@ is_safe_url:
     xor eax, eax
     ret
 
+# is_video_url(rdi=url_ptr, rsi=url_len) -> eax=1 if path before ?/# ends with video ext
+is_video_url:
+    push r12
+    push r13
+    mov r12, rdi
+    mov r13, rsi
+
+    mov rdi, r12; mov rsi, r13; mov edx, '?'; call xmemchr
+    cmp rax, -1
+    je .Livu_hash
+    mov r13, rax
+.Livu_hash:
+    mov rdi, r12; mov rsi, r13; mov edx, '#'; call xmemchr
+    cmp rax, -1
+    je .Livu_chk
+    mov r13, rax
+.Livu_chk:
+    cmp r13, 4
+    jb .Livu_no
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + vext_mp4]; mov ecx, 4; call xslice_eq_ci
+    test eax, eax; jnz .Livu_yes
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + vext_m4v]; mov ecx, 4; call xslice_eq_ci
+    test eax, eax; jnz .Livu_yes
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + vext_mov]; mov ecx, 4; call xslice_eq_ci
+    test eax, eax; jnz .Livu_yes
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + vext_ogg]; mov ecx, 4; call xslice_eq_ci
+    test eax, eax; jnz .Livu_yes
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + vext_ogv]; mov ecx, 4; call xslice_eq_ci
+    test eax, eax; jnz .Livu_yes
+    cmp r13, 5
+    jb .Livu_no
+    lea rdi, [r12 + r13 - 5]; mov esi, 5; lea rdx, [rip + vext_webm]; mov ecx, 5; call xslice_eq_ci
+    test eax, eax; jnz .Livu_yes
+.Livu_no:
+    xor eax, eax
+    jmp .Livu_ret
+.Livu_yes:
+    mov eax, 1
+.Livu_ret:
+    pop r13
+    pop r12
+    ret
+
 # --- Inline Markdown Renderer ---
 # md_render_inline(rdi=ptr, rsi=len, rdx=&sb)
 .globl md_render_inline
@@ -617,6 +673,12 @@ md_render_inline:
     test eax, eax
     jz .Lmi_plain
     push rcx
+    lea rdi, [r12 + r15 + 2]
+    mov rsi, rcx
+    call is_video_url
+    test eax, eax
+    jnz .Lmi_emit_video
+
     mov rdi, r14
     lea rsi, [rip + tag_img_o]
     mov edx, 10
@@ -638,6 +700,33 @@ md_render_inline:
     mov rdi, r14
     lea rsi, [rip + tag_img_c]
     mov edx, 17
+    call sb_mem
+    pop rcx
+    lea rbx, [r15 + 2 + rcx + 1]
+    jmp .Lmi_loop
+
+.Lmi_emit_video:
+    mov rdi, r14
+    lea rsi, [rip + tag_vid_o]
+    mov edx, tag_vid_o_len
+    call sb_mem
+    mov rdi, r14
+    lea rsi, [r12 + r15 + 2]
+    mov rdx, [rsp]
+    call sb_esc_html
+    mov rdi, r14
+    lea rsi, [rip + tag_vid_m]
+    mov edx, tag_vid_m_len
+    call sb_mem
+    mov rdi, r14
+    lea rsi, [r12 + rbx + 2]
+    mov rdx, r15
+    sub rdx, rbx
+    sub rdx, 2
+    call sb_esc_html
+    mov rdi, r14
+    lea rsi, [rip + tag_vid_c]
+    mov edx, tag_vid_c_len
     call sb_mem
     pop rcx
     lea rbx, [r15 + 2 + rcx + 1]
