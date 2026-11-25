@@ -420,6 +420,7 @@ input:focus-visible {
   object-fit: cover;
   object-position: center 22%;
   display: block;
+  cursor: zoom-in;
 }
 [data-theme="dark"] .hero-banner-img {
   filter: brightness(0.76) saturate(1.08);
@@ -1478,6 +1479,7 @@ input:focus-visible {
   border-radius: 26px;
   object-fit: cover;
   box-shadow: var(--shadow-card);
+  cursor: zoom-in;
 }
 .not-found-card h1 { margin: 4px 0 0; font-size: 1.52rem; }
 
@@ -1648,6 +1650,22 @@ input:focus-visible {
   background: rgba(255, 148, 194, 0.24);
   color: #ffd9ec;
 }
+.lightbox-badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid rgba(116, 201, 255, 0.4);
+  background: rgba(116, 201, 255, 0.14);
+  color: #cfe8ff;
+}
+.lightbox-badge.is-hd {
+  border-color: rgba(255, 148, 194, 0.55);
+  background: rgba(255, 148, 194, 0.2);
+  color: #ffd9ec;
+}
+.lightbox-badge.hidden { display: none; }
 
 /* Global Soft Toast Pill (pure GPU opacity + transform, zero blur) */
 .sky-toast {

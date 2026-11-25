@@ -353,9 +353,20 @@
   }
 
   /* ---------------------------------------------------------
-     6. Zero-Blur GPU Illustration Lightbox (Touch Swipe + 2x Zoom + Keys)
+     6. Zero-Blur GPU Illustration Lightbox (Click-to-Load HD Original + 2x Zoom)
      --------------------------------------------------------- */
-  var lb = { el: null, img: null, cap: null, orig: null, zoomBtn: null, prev: null, next: null, items: [], idx: 0, touchX: 0, lastTap: 0, zoomed: false };
+  var lb = { el: null, img: null, cap: null, badge: null, orig: null, zoomBtn: null, prev: null, next: null, items: [], idx: 0, touchX: 0, lastTap: 0, zoomed: false, loadSeq: 0 };
+  var loadedOrigs = new Set();
+
+  function extractOrigUrl(urlStr) {
+    if (!urlStr) return '';
+    try {
+      var u = new URL(urlStr, window.location.origin);
+      var o = (u.searchParams.get('orig') || '').trim();
+      if (o && (o.indexOf('/') === 0 || /^https?:\/\//i.test(o))) return o;
+    } catch (_) {}
+    return '';
+  }
 
   function setLightboxZoom(on, clientX, clientY) {
     if (!lb.img) return;
@@ -390,12 +401,13 @@
       '<button class="lightbox-nav lightbox-prev" type="button" aria-label="上一张">‹</button>' +
       '<img class="lightbox-img" alt="">' +
       '<button class="lightbox-nav lightbox-next" type="button" aria-label="下一张">›</button>' +
-      '<div class="lightbox-bar"><span class="lightbox-cap"></span><button class="lightbox-zoom" type="button" aria-label="缩放预览">🔍 放大</button><a class="lightbox-orig" target="_blank" rel="noopener">原图 ↗</a></div>';
+      '<div class="lightbox-bar"><span class="lightbox-cap"></span><span class="lightbox-badge hidden"></span><button class="lightbox-zoom" type="button" aria-label="缩放预览">🔍 放大</button><a class="lightbox-orig" target="_blank" rel="noopener">原图 ↗</a></div>';
     document.body.appendChild(wrap);
 
     lb.el = wrap;
     lb.img = wrap.querySelector('.lightbox-img');
     lb.cap = wrap.querySelector('.lightbox-cap');
+    lb.badge = wrap.querySelector('.lightbox-badge');
     lb.orig = wrap.querySelector('.lightbox-orig');
     lb.zoomBtn = wrap.querySelector('.lightbox-zoom');
     lb.prev = wrap.querySelector('.lightbox-prev');
@@ -440,19 +452,58 @@
     }, { passive: true });
   }
 
+  function setLightboxBadge(text, isHd) {
+    if (!lb.badge) return;
+    if (!text) {
+      lb.badge.textContent = '';
+      lb.badge.className = 'lightbox-badge hidden';
+      return;
+    }
+    lb.badge.textContent = text;
+    lb.badge.className = 'lightbox-badge' + (isHd ? ' is-hd' : '');
+  }
+
   function showLightboxIndex(i) {
     if (!lb.items.length) return;
     setLightboxZoom(false);
     lb.idx = (i + lb.items.length) % lb.items.length;
     var item = lb.items[lb.idx];
-    lb.img.src = item.src;
+    var seq = ++lb.loadSeq;
+    var targetOrig = item.orig || '';
     lb.img.alt = item.alt || '';
-    lb.orig.href = item.src;
+    lb.orig.href = targetOrig || item.src;
     var countTxt = lb.items.length > 1 ? ('(' + (lb.idx + 1) + ' / ' + lb.items.length + ') ') : '';
     lb.cap.textContent = countTxt + (item.alt || '');
     var hideNav = lb.items.length <= 1;
     lb.prev.classList.toggle('hidden', hideNav);
     lb.next.classList.toggle('hidden', hideNav);
+
+    if (targetOrig && targetOrig !== item.src) {
+      if (loadedOrigs.has(targetOrig)) {
+        lb.img.src = targetOrig;
+        setLightboxBadge('✦ 已加载高清原图', true);
+      } else {
+        // Show cached fast preview instantly, then upgrade seamlessly to full-quality original
+        lb.img.src = item.src;
+        setLightboxBadge('⏳ 加载高清原图中…', false);
+        var hi = new Image();
+        hi.decoding = 'async';
+        hi.onload = function () {
+          loadedOrigs.add(targetOrig);
+          if (lb.loadSeq !== seq) return;
+          lb.img.src = targetOrig;
+          setLightboxBadge('✦ 已加载高清原图', true);
+        };
+        hi.onerror = function () {
+          if (lb.loadSeq !== seq) return;
+          setLightboxBadge('', false);
+        };
+        hi.src = targetOrig;
+      }
+    } else {
+      lb.img.src = item.src;
+      setLightboxBadge('', false);
+    }
   }
 
   function openLightbox(items, startIdx) {
@@ -465,6 +516,7 @@
 
   function closeLightbox() {
     if (!lb.el || !lb.el.classList.contains('is-open')) return;
+    lb.loadSeq++;
     setLightboxZoom(false);
     lb.el.classList.remove('is-open');
     document.body.style.overflow = '';
@@ -474,11 +526,16 @@
     if (lb.items.length > 1) showLightboxIndex(lb.idx + delta);
   }
 
-  function initLightbox() {
-    var imgs = Array.prototype.slice.call(document.querySelectorAll('.article-cover, .prose img'));
+  function bindLightboxGroup(selector) {
+    var imgs = Array.prototype.slice.call(document.querySelectorAll(selector));
     if (!imgs.length) return;
     var items = imgs.map(function (im) {
-      return { src: im.currentSrc || im.src, alt: im.alt || '' };
+      var rawSrc = im.getAttribute('src') || im.currentSrc || im.src;
+      return {
+        src: im.currentSrc || im.src,
+        orig: extractOrigUrl(rawSrc),
+        alt: im.alt || ''
+      };
     });
     imgs.forEach(function (im, idx) {
       if (im.dataset.lbBound) return;
@@ -489,6 +546,12 @@
         openLightbox(items, idx);
       });
     });
+  }
+
+  function initLightbox() {
+    bindLightboxGroup('.article-cover, .prose img');
+    bindLightboxGroup('.hero-banner-img');
+    bindLightboxGroup('.not-found-img');
   }
 
   /* ---------------------------------------------------------

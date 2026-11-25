@@ -1026,53 +1026,41 @@
     syncCoverUI();
   });
 
-  /* Client-side Image Compression (keeps huge phone photos crisp & < 1.8MB) */
-  function prepareImageBlob(file) {
-    return new Promise(function (resolve, reject) {
-      if (!file || !file.type || file.type.indexOf('image/') !== 0) {
-        reject(new Error('请选择图片文件（JPG / PNG / GIF / WebP）'));
-        return;
-      }
-      // Keep GIF (preserve animation) or small images <= 1.2MB directly as-is
-      if (file.type === 'image/gif' || file.size <= 1200000) {
-        if (file.size > 1900000) {
-          reject(new Error('GIF 动图超过 1.9MB 限制，请压缩后再上传'));
-          return;
-        }
-        resolve(file);
-        return;
-      }
-      var img = new Image();
-      var objUrl = URL.createObjectURL(file);
-      img.onload = function () {
-        URL.revokeObjectURL(objUrl);
-        var maxW = 1600;
-        var w = img.naturalWidth || img.width;
-        var h = img.naturalHeight || img.height;
-        if (w > maxW) {
-          h = Math.round(h * (maxW / w));
-          w = maxW;
-        }
-        var canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        canvas.toBlob(function (blob) {
-          if (!blob) { resolve(file); return; }
-          if (blob.size > 1900000) {
-            canvas.toBlob(function (b2) { resolve(b2 || blob); }, 'image/jpeg', 0.72);
-          } else {
-            resolve(blob);
-          }
-        }, 'image/jpeg', 0.86);
-      };
-      img.onerror = function () {
-        URL.revokeObjectURL(objUrl);
-        resolve(file);
-      };
-      img.src = objUrl;
+  /* Dual-Tier Image Pipeline: Fast WebP Preview + Full-Quality Original (?orig=...) */
+  var MAX_UPLOAD_BYTES = 3850000;
+
+  function extractOrigUrl(urlStr) {
+    if (!urlStr) return '';
+    try {
+      var u = new URL(urlStr, window.location.origin);
+      var o = (u.searchParams.get('orig') || '').trim();
+      if (o && (o.indexOf('/') === 0 || /^https?:\/\//i.test(o))) return o;
+    } catch (_) {}
+    return '';
+  }
+
+  function canvasToBlob(canvas, mime, q) {
+    return new Promise(function (resolve) {
+      canvas.toBlob(function (b) { resolve(b || null); }, mime, q);
     });
+  }
+
+  function encodePreviewBlob(canvas, q) {
+    return canvasToBlob(canvas, 'image/webp', q).then(function (b) {
+      if (b && b.type === 'image/webp') return b;
+      return canvasToBlob(canvas, 'image/jpeg', q);
+    });
+  }
+
+  function renderScaledCanvas(img, sx, sy, sw, sh, targetW, targetH) {
+    var c = document.createElement('canvas');
+    c.width = targetW;
+    c.height = targetH;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetW, targetH);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
+    return c;
   }
 
   function uploadRawBlob(blob) {
@@ -1090,8 +1078,67 @@
     });
   }
 
+  function uploadDualPair(previewBlob, origBlob) {
+    if (!previewBlob || !origBlob || previewBlob.size >= origBlob.size * 0.82) {
+      return uploadRawBlob(origBlob || previewBlob);
+    }
+    return Promise.all([uploadRawBlob(previewBlob), uploadRawBlob(origBlob)]).then(function (urls) {
+      return urls[0] + '?orig=' + urls[1];
+    });
+  }
+
   function uploadImageFile(file) {
-    return prepareImageBlob(file).then(uploadRawBlob);
+    return new Promise(function (resolve, reject) {
+      if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+        reject(new Error('请选择图片文件（JPG / PNG / GIF / WebP）'));
+        return;
+      }
+      // Keep GIF (preserve animation) or already-tiny images (<= 140 KB) as single file
+      if (file.type === 'image/gif' || file.size <= 140000) {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          reject(new Error('GIF 动图超过 3.8MB 限制，请压缩后再上传'));
+          return;
+        }
+        uploadRawBlob(file).then(resolve, reject);
+        return;
+      }
+      var img = new Image();
+      var objUrl = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(objUrl);
+        var natW = img.naturalWidth || img.width;
+        var natH = img.naturalHeight || img.height;
+
+        // 1) Original blob: keep original file untouched if <= 3.7 MB, else gentle HD JPEG
+        var origPromise;
+        if (file.size <= MAX_UPLOAD_BYTES) {
+          origPromise = Promise.resolve(file);
+        } else {
+          var ow = Math.min(2400, natW);
+          var oh = Math.round(natH * (ow / natW));
+          var oc = renderScaledCanvas(img, 0, 0, natW, natH, ow, oh);
+          origPromise = canvasToBlob(oc, 'image/jpeg', 0.92).then(function (b) {
+            if (b && b.size > MAX_UPLOAD_BYTES) return canvasToBlob(oc, 'image/jpeg', 0.80);
+            return b || file;
+          });
+        }
+
+        // 2) Fast lightweight WebP preview (max 1280px wide)
+        var pw = Math.min(1280, natW);
+        var ph = Math.round(natH * (pw / natW));
+        var pc = renderScaledCanvas(img, 0, 0, natW, natH, pw, ph);
+        var prevPromise = encodePreviewBlob(pc, 0.82);
+
+        Promise.all([prevPromise, origPromise])
+          .then(function (pair) { return uploadDualPair(pair[0], pair[1]); })
+          .then(resolve, reject);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(objUrl);
+        uploadRawBlob(file).then(resolve, reject);
+      };
+      img.src = objUrl;
+    });
   }
 
   /* =========================================================
@@ -1196,7 +1243,8 @@
     }
     crop.rawFile = rawFile || null;
     crop.aspect = opts.aspect || (16 / 9);
-    crop.maxW = opts.maxW || 1280;
+    crop.maxW = opts.maxW || 1600;
+    crop.previewW = opts.previewW || 1080;
     crop.onDone = opts.onDone || function (url) {
       fCover.value = url;
       syncCoverUI();
@@ -1351,39 +1399,31 @@
 
     var outW = Math.min(crop.maxW, Math.max(512, Math.round(sw)));
     var outH = Math.round(outW / crop.aspect);
-    var canvas = document.createElement('canvas');
-    canvas.width = outW;
-    canvas.height = outH;
-    var ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, outW, outH);
+    var prevW = Math.min(crop.previewW || 1080, outW);
+    var prevH = Math.round(prevW / crop.aspect);
     try {
-      ctx.drawImage(cropImg, sx, sy, sw, sh, 0, 0, outW, outH);
-      canvas.toBlob(function (blob) {
-        if (!blob) {
+      var origCanvas = renderScaledCanvas(cropImg, sx, sy, sw, sh, outW, outH);
+      var prevCanvas = (prevW < outW) ? renderScaledCanvas(cropImg, sx, sy, sw, sh, prevW, prevH) : origCanvas;
+      var origP = canvasToBlob(origCanvas, 'image/jpeg', 0.93).then(function (b) {
+        if (b && b.size > MAX_UPLOAD_BYTES) return canvasToBlob(origCanvas, 'image/jpeg', 0.82);
+        return b;
+      });
+      var prevQ = Math.abs(crop.aspect - 1) < 0.05 ? 0.86 : 0.82;
+      var prevP = encodePreviewBlob(prevCanvas, prevQ);
+      Promise.all([prevP, origP])
+        .then(function (pair) {
+          if (!pair[0] && !pair[1]) throw new Error('图片裁剪失败，请重试');
+          return uploadDualPair(pair[0], pair[1]);
+        })
+        .then(function (url) {
+          closeCropper();
+          if (doneCb) doneCb(url);
+        })
+        .catch(function (err) {
           cropConfirmBtn.disabled = false;
           cropConfirmBtn.textContent = '✂️ 确认裁剪并上传';
-          showToast('图片裁剪失败，请重试', true);
-          return;
-        }
-        var doUpload = function (finalBlob) {
-          uploadRawBlob(finalBlob)
-            .then(function (url) {
-              closeCropper();
-              if (doneCb) doneCb(url);
-            })
-            .catch(function (err) {
-              cropConfirmBtn.disabled = false;
-              cropConfirmBtn.textContent = '✂️ 确认裁剪并上传';
-              showToast(esc(err.message), true);
-            });
-        };
-        if (blob.size > 1850000) {
-          canvas.toBlob(function (b2) { doUpload(b2 || blob); }, 'image/jpeg', 0.74);
-        } else {
-          doUpload(blob);
-        }
-      }, 'image/jpeg', 0.88);
+          showToast(esc(err.message), true);
+        });
     } catch (e) {
       cropConfirmBtn.disabled = false;
       cropConfirmBtn.textContent = '✂️ 确认裁剪并上传';
@@ -1396,7 +1436,7 @@
   coverRecropBtn.addEventListener('click', function () {
     var u = fCover.value.trim();
     if (!u) return;
-    openCropper(u, null);
+    openCropper(extractOrigUrl(u) || u, null);
   });
   function handleCoverPick(file) {
     if (!file) return;
@@ -1826,8 +1866,8 @@
     sFooter.value = cfg.footer_text || '';
     sSiteUrl.value = cfg.site_url || '';
     sPerPage.value = String(cfg.per_page || 6);
-    sAvatarUrl.value = cfg.avatar_url || '/static/avatar.jpg?v=2';
-    sBannerUrl.value = cfg.banner_url || '/static/hero-banner.jpg?v=2';
+    sAvatarUrl.value = cfg.avatar_url || '/static/avatar.webp?v=3&orig=/static/avatar.jpg';
+    sBannerUrl.value = cfg.banner_url || '/static/hero-banner.webp?v=3&orig=/static/hero-banner.jpg';
     sStudioPath.value = cfg.studio_path || '/studio';
     sGRepo.value = cfg.giscus_repo || '';
     sGRid.value = cfg.giscus_repo_id || '';
@@ -1855,31 +1895,34 @@
   function openAvatarCropper(src, file) {
     openCropper(src, file, {
       aspect: 1,
-      maxW: 640,
+      maxW: 1024,
+      previewW: 256,
       title: '✂️ 自由裁剪博主头像（1:1 圆形框）',
       onDone: function (url) {
         sAvatarUrl.value = url;
         sAvatarPrev.src = url;
-        showToast('头像已裁剪上传，点击「保存站点设置」生效 ✦');
+        showToast('头像已裁剪上传（自动生成轻巧预览 + 高清原图），点击「保存站点设置」生效 ✦');
       }
     });
   }
   function openBannerCropper(src, file) {
     openCropper(src, file, {
       aspect: 16 / 9,
-      maxW: 1376,
+      maxW: 1600,
+      previewW: 1080,
       title: '✂️ 自由裁剪首页头图（16:9 宽屏框）',
       onDone: function (url) {
         sBannerUrl.value = url;
         sBannerPrev.src = url;
-        showToast('头图已裁剪上传，点击「保存站点设置」生效 ✦');
+        showToast('头图已裁剪上传（自动生成轻巧预览 + 高清原图），点击「保存站点设置」生效 ✦');
       }
     });
   }
 
   document.getElementById('s-avatar-btn').addEventListener('click', function () { sAvatarFile.click(); });
   document.getElementById('s-avatar-recrop').addEventListener('click', function () {
-    if (sAvatarUrl.value.trim()) openAvatarCropper(sAvatarUrl.value.trim(), null);
+    var u = sAvatarUrl.value.trim();
+    if (u) openAvatarCropper(extractOrigUrl(u) || u, null);
   });
   sAvatarFile.addEventListener('change', function () {
     if (sAvatarFile.files && sAvatarFile.files[0]) openAvatarCropper(sAvatarFile.files[0], sAvatarFile.files[0]);
@@ -1888,7 +1931,8 @@
 
   document.getElementById('s-banner-btn').addEventListener('click', function () { sBannerFile.click(); });
   document.getElementById('s-banner-recrop').addEventListener('click', function () {
-    if (sBannerUrl.value.trim()) openBannerCropper(sBannerUrl.value.trim(), null);
+    var u = sBannerUrl.value.trim();
+    if (u) openBannerCropper(extractOrigUrl(u) || u, null);
   });
   sBannerFile.addEventListener('change', function () {
     if (sBannerFile.files && sBannerFile.files[0]) openBannerCropper(sBannerFile.files[0], sBannerFile.files[0]);

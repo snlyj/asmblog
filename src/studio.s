@@ -176,7 +176,7 @@ j_err_cat:      .ascii "{\"error\":\"分类名称不合法（1-60字节，不能
 .equ j_err_cat_len, . - j_err_cat
 j_err_catmax:   .ascii "{\"error\":\"分类数量已达上限\"}"
 .equ j_err_catmax_len, . - j_err_catmax
-j_err_imgsize:  .ascii "{\"error\":\"图片大小无效（最大约 1.9MB）\"}"
+j_err_imgsize:  .ascii "{\"error\":\"图片大小无效（最大约 3.8MB）\"}"
 .equ j_err_imgsize_len, . - j_err_imgsize
 j_err_imgtype:  .ascii "{\"error\":\"仅支持 JPG / PNG / GIF / WebP 图片\"}"
 .equ j_err_imgtype_len, . - j_err_imgtype

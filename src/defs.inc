@@ -135,11 +135,11 @@
 
 # --- Capacity limits ---
 .equ MAX_CONNS,             128
-.equ CONN_RX_CAP,           2097152   # 2 MiB read buf (demand-paged: 0 RAM when idle; supports direct image uploads)
+.equ CONN_RX_CAP,           4194304   # 4 MiB read buf (demand-paged: 0 RAM when idle; supports full-res original uploads)
 .equ CONN_TX_CAP,           262144    # 256 KiB write buf per conn (demand paged!)
 .equ MAX_HDR_BYTES,         8192
 .equ MAX_URI_BYTES,         2048
-.equ MAX_BODY_BYTES,        2000000   # ~1.9 MiB max upload/post body
+.equ MAX_BODY_BYTES,        4000000   # ~3.8 MiB max upload/post body
 .equ IDLE_TIMEOUT_SEC,      30
 
 .equ ARENA_SIZE,            16777216  # 16 MiB mmap arena for posts/html/templates

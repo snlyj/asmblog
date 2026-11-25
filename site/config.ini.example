@@ -8,8 +8,8 @@ author = Sakura
 footer_text = Made with ♡ · Powered by Pure x86-64 Assembly
 
 # Custom avatar (1:1) and hero banner (16:9) — can also be uploaded & cropped inside Author Studio
-avatar_url = /static/avatar.jpg?v=2
-banner_url = /static/hero-banner.jpg?v=2
+avatar_url = /static/avatar.webp?v=3&orig=/static/avatar.jpg
+banner_url = /static/hero-banner.webp?v=3&orig=/static/hero-banner.jpg
 
 # HTTP listen port (use 8080 when running behind Caddy/Nginx HTTPS reverse proxy)
 port = 8080

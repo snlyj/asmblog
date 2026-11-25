@@ -105,9 +105,9 @@ def_dist_dir:    .ascii "dist"
 .equ def_dist_dir_len, . - def_dist_dir
 def_footer:      .ascii "Made with ♡ · Powered by AsmBlog"
 .equ def_footer_len, . - def_footer
-def_avatar:      .ascii "/static/avatar.jpg?v=2"
+def_avatar:      .ascii "/static/avatar.webp?v=3&orig=/static/avatar.jpg"
 .equ def_avatar_len, . - def_avatar
-def_banner:      .ascii "/static/hero-banner.jpg?v=2"
+def_banner:      .ascii "/static/hero-banner.webp?v=3&orig=/static/hero-banner.jpg"
 .equ def_banner_len, . - def_banner
 def_studio_path: .ascii "/studio"
 .equ def_studio_path_len, . - def_studio_path
