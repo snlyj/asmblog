@@ -33,7 +33,7 @@ g_reload_count:  .quad 0
 g_start_sec:     .quad 0
 
 store_dirent_buf: .skip 16384
-store_file_buf:   .skip 131072
+store_file_buf:   .skip 262144
 store_html_buf:   .skip 262144
 store_path_buf:   .skip 512
 
@@ -377,7 +377,7 @@ load_theme_templates:
 
     lea rdi, [rip + store_path_buf]
     lea rsi, [rip + store_file_buf]
-    mov edx, 131071
+    mov edx, 262143
     call read_file_buf
     pop rcx               # name_len
     test rax, rax
@@ -699,7 +699,7 @@ store_reload:
     # read file
     lea rdi, [rip + store_path_buf]
     lea rsi, [rip + store_file_buf]
-    mov edx, 131071
+    mov edx, 262143
     call read_file_buf
     test rax, rax
     js .Lsr_skip_pop

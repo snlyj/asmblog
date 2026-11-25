@@ -12,6 +12,7 @@ g_running:       .quad 1
 .section .bss
 .align 8
 conns:           .skip MAX_CONNS * CONN_SIZE
+.align 4096
 conn_rx_pool:    .skip MAX_CONNS * CONN_RX_CAP
 conn_tx_pool:    .skip MAX_CONNS * CONN_TX_CAP
 
@@ -94,6 +95,7 @@ conn_alloc:
     mov qword ptr [r12 + CONN_KEEP_ALIVE], 1
     mov [r12 + CONN_PEER_IP], ebx
     mov qword ptr [r12 + CONN_IS_HEAD], 0
+    mov qword ptr [r12 + CONN_RX_PEAK], 0
     call mono_sec
     mov [r12 + CONN_LAST_ACTIVE], rax
     inc qword ptr [rip + g_active_conns]
@@ -105,6 +107,19 @@ conn_alloc:
     xor eax, eax
     pop r12
     pop rbx
+    ret
+
+# conn_trim_rx(rdi=&conn) -> returns >64 KiB physical RX pages to kernel after large uploads
+conn_trim_rx:
+    cmp qword ptr [rdi + CONN_RX_PEAK], 65536
+    jbe .Lctr_done
+    mov qword ptr [rdi + CONN_RX_PEAK], 0
+    mov rdi, [rdi + CONN_RX_PTR]
+    add rdi, 65536
+    mov rsi, CONN_RX_CAP - 65536
+    mov edx, MADV_DONTNEED
+    jmp sys_madvise
+.Lctr_done:
     ret
 
 # conn_close(rdi=&conn)
@@ -131,6 +146,8 @@ conn_close:
     call sys_close
     mov qword ptr [r12 + CONN_FD], -1
     mov qword ptr [r12 + CONN_STATE], 0
+    mov rdi, r12
+    call conn_trim_rx
     dec qword ptr [rip + g_active_conns]
 .Lcc_done:
     pop r12
@@ -221,6 +238,8 @@ conn_try_write:
     # If pipelined bytes remain in rx_buf, signal caller to continue iteratively (zero recursion)
     cmp qword ptr [r12 + CONN_RX_LEN], 0
     jne .Lctw_has_pipe
+    mov rdi, r12
+    call conn_trim_rx
     mov rdi, r12
     mov esi, EPOLLIN | EPOLLRDHUP
     call epoll_mod_conn
@@ -354,6 +373,11 @@ conn_on_read:
     test rax, rax
     jle .Lcor_close
     add [r12 + CONN_RX_LEN], rax
+    mov rcx, [r12 + CONN_RX_LEN]
+    cmp rcx, [r12 + CONN_RX_PEAK]
+    jbe .Lcor_peak_ok
+    mov [r12 + CONN_RX_PEAK], rcx
+.Lcor_peak_ok:
     call mono_sec
     mov [r12 + CONN_LAST_ACTIVE], rax
     # Try parsing immediately once we have bytes

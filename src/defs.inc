@@ -14,6 +14,7 @@
 .equ SYS_rt_sigaction,      13
 .equ SYS_rt_sigprocmask,    14
 .equ SYS_writev,            20
+.equ SYS_madvise,           28
 .equ SYS_sendfile,          40
 .equ SYS_socket,            41
 .equ SYS_accept,            43
@@ -101,6 +102,7 @@
 .equ PROT_WRITE,            2
 .equ MAP_PRIVATE,           0x2
 .equ MAP_ANONYMOUS,         0x20
+.equ MADV_DONTNEED,         4
 
 .equ CLOCK_REALTIME,        0
 .equ CLOCK_MONOTONIC,       1
@@ -164,6 +166,7 @@
 .equ CONN_LAST_ACTIVE,      88        # i64 (monotonic sec)
 .equ CONN_PEER_IP,          96        # u32 (network byte order IPv4)
 .equ CONN_IS_HEAD,          104       # u64 (1 if HEAD request)
+.equ CONN_RX_PEAK,          112       # u64 (high-water RX bytes for madvise trim)
 .equ CONN_SIZE,             128
 
 # --- req_t (256 bytes): parsed HTTP request ---

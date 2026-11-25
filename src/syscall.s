@@ -57,6 +57,12 @@ sys_munmap:
     syscall
     ret
 
+.globl sys_madvise
+sys_madvise:
+    mov eax, SYS_madvise
+    syscall
+    ret
+
 .globl sys_socket
 sys_socket:
     mov eax, SYS_socket

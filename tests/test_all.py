@@ -537,6 +537,25 @@ def test_server():
         assert "immutable" in img_hdrs.get("Cache-Control", "")
         assert img_hdrs.get("Accept-Ranges") == "bytes", f"missing Accept-Ranges: {img_hdrs}"
 
+        # Verify large 2 MiB upload releases physical RX pages back to kernel via madvise(MADV_DONTNEED)
+        rss_pre_big = read_rss_kb(proc.pid)
+        big_png = tiny_png + (b"\x00" * (2 * 1024 * 1024))
+        st_big, _, big_body = http_req(
+            "/api/studio/upload",
+            method="POST",
+            headers={**cookie_hdr, "Content-Type": "image/png"},
+            data=big_png,
+        )
+        assert_eq(st_big, 201, "2 MiB upload 201")
+        big_url = json.loads(big_body)["url"]
+        big_disk = os.path.join(SITE, "content", big_url.lstrip("/"))
+        temp_files.append(big_disk)
+        time.sleep(0.05)
+        rss_post_big = read_rss_kb(proc.pid)
+        assert rss_post_big <= rss_pre_big + 512, f"RX pages not reclaimed after 2 MiB upload: before={rss_pre_big}KiB, after={rss_post_big}KiB"
+        os.unlink(big_disk)
+        temp_files.remove(big_disk)
+
         # Chunked video upload: reject fake non-video & path traversal IDs
         st_fv, _, _ = http_req(
             "/api/studio/upload-video?done=1",
