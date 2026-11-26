@@ -2723,6 +2723,10 @@ studio_save_json_file:
     ja .Lssjf_bad
     cmp byte ptr [rax], bl
     jne .Lssjf_bad
+    # Also verify matching closing delimiter (']' for '[', '}' for '{') to reject truncated payloads
+    lea ecx, [rbx + 2]
+    cmp byte ptr [rax + rdx - 1], cl
+    jne .Lssjf_bad
 
     mov [rsp + 0], rax
     mov [rsp + 8], rdx
@@ -2996,6 +3000,9 @@ handle_studio_media_list:
     mov r14d, eax
 
 .Lhsml_emit:
+    # Stop gracefully before buffer limit so output JSON is always valid and cleanly closed with ']'
+    cmp qword ptr [rsp + 0 + SB_LEN], 261600
+    jae .Lhsml_close
     cmp qword ptr [rsp + 208], 0
     je .Lhsml_first
     lea rdi, [rsp + 0]; mov esi, ','; call sb_byte

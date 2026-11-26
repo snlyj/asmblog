@@ -1646,7 +1646,11 @@
             });
           });
           grid.querySelectorAll('.gal-img').forEach(function (im) {
-            im.addEventListener('load', recalcMetrics, { once: true });
+            if (im.complete && im.naturalWidth > 0) return;
+            im.classList.add('img-fade');
+            var done = function () { im.classList.add('is-loaded'); recalcMetrics(); };
+            im.addEventListener('load', done, { once: true });
+            im.addEventListener('error', done, { once: true });
           });
           recalcMetrics();
         }
@@ -1799,6 +1803,11 @@
           }
         }
 
+        if (bgm.list.length <= 1) {
+          prevBtn.style.display = 'none';
+          nextBtn.style.display = 'none';
+        }
+
         function syncPlayState() {
           bgm.playing = !audio.paused && !audio.ended;
           dock.classList.toggle('is-playing', bgm.playing);
@@ -1831,7 +1840,13 @@
           audio.currentTime = ratio * audio.duration;
         });
 
-        audio.addEventListener('play', syncPlayState);
+        audio.addEventListener('play', function () {
+          // Pause any playing post video so audio streams never clash
+          document.querySelectorAll('video').forEach(function (v) {
+            if (!v.paused) { try { v.pause(); } catch (_) {} }
+          });
+          syncPlayState();
+        });
         audio.addEventListener('pause', syncPlayState);
         audio.addEventListener('timeupdate', function () {
           var dur = audio.duration || 0;
@@ -1842,7 +1857,7 @@
           }
         });
         audio.addEventListener('ended', function () {
-          if (bgm.loopOne) {
+          if (bgm.loopOne || bgm.list.length === 1) {
             audio.currentTime = 0;
             audio.play().catch(function () {});
           } else {
@@ -1851,7 +1866,7 @@
         });
         audio.addEventListener('error', function () {
           syncPlayState();
-          showToast('当前音频无法加载，请检查链接', true);
+          showToast('当前音频无法加载，请检查链接');
         });
 
         loadTrack(0, false);
@@ -1890,7 +1905,7 @@
     if (url.pathname.indexOf('/static/') === 0) return false;
     if (url.pathname.indexOf('/uploads/') === 0) return false;
     if (url.pathname.indexOf('/api/') === 0) return false;
-    if (/\.(xml|json|ico|png|jpg|jpeg|webp|gif|svg|css|js|pdf|zip)$/i.test(url.pathname)) return false;
+    if (/\.(xml|json|ico|png|jpg|jpeg|webp|gif|svg|css|js|pdf|zip|mp4|webm|mov|ogg|mp3|m4a|flac|wav)$/i.test(url.pathname)) return false;
     return true;
   }
 

@@ -150,11 +150,16 @@ def test_site_ssg_build():
         sidx = json.loads(open(os.path.join(dist_tmp, "search-index.json"), encoding="utf-8").read())
         assert_eq(len(sidx), 3, "search-index count")
 
-        # Valid XML for RSS and Sitemap
+        # Valid XML for RSS and Sitemap + SSG gallery/about/bgm outputs
         rss = ET.fromstring(open(os.path.join(dist_tmp, "rss.xml"), encoding="utf-8").read())
         assert len(rss.findall(".//item")) == 3
         sm = ET.fromstring(open(os.path.join(dist_tmp, "sitemap.xml"), encoding="utf-8").read())
-        assert len(list(sm)) == 4  # home + 3 posts
+        assert len(list(sm)) == 6  # home + gallery + about + 3 posts
+        assert "精选画廊" in open(os.path.join(dist_tmp, "gallery/index.html"), encoding="utf-8").read()
+        assert "friends-grid" in open(os.path.join(dist_tmp, "about/index.html"), encoding="utf-8").read()
+        assert isinstance(json.loads(open(os.path.join(dist_tmp, "gallery.json"), encoding="utf-8").read()), list)
+        assert isinstance(json.loads(open(os.path.join(dist_tmp, "about.json"), encoding="utf-8").read()), dict)
+        assert isinstance(json.loads(open(os.path.join(dist_tmp, "bgm.json"), encoding="utf-8").read()), list)
 
         # Copied static assets
         assert os.path.getsize(os.path.join(dist_tmp, "static/sky-ribbon.css")) > 500
@@ -313,19 +318,23 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v15 = http_req("/static/sky-ribbon.css?v=15")
+        st_imm, hdrs_imm, css_v16 = http_req("/static/sky-ribbon.css?v=16")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v15)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v16)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
-        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
+        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b"visibility: hidden", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
             assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v15 = http_req("/static/sky-ribbon.js?v=15")
+        st_js, _, js_v16 = http_req("/static/sky-ribbon.js?v=16")
         assert_eq(st_js, 200, "versioned static js 200")
         for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"initGallery", b"initAbout", b"initBgmPlayer", b"pauseBgm", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart"):
-            assert required_js in js_v15, f"missing expected UI JS feature: {required_js!r}"
+            assert required_js in js_v16, f"missing expected UI JS feature: {required_js!r}"
+
+        _, _, sm_xml = http_req("/sitemap.xml")
+        sm_txt = sm_xml.decode("utf-8")
+        assert "/gallery/</loc>" in sm_txt and "/about/</loc>" in sm_txt, "sitemap must include /gallery/ and /about/"
 
         # Open Graph / Twitter Card social preview meta + zero-bloat Giscus hidden by default
         assert 'property="og:type" content="website"' in home_txt
@@ -699,7 +708,15 @@ def test_server():
         bgm_path = os.path.join(SITE, "content/bgm.json")
         temp_files.extend([gal_path, abt_path, bgm_path])
 
-        # 1) Curated Gallery save & public read
+        # 1) Curated Gallery save & public read (+ reject truncated/mismatched JSON)
+        for ep, bad_j in [
+            ("/api/studio/gallery", b'[{"id":"truncated"'),
+            ("/api/studio/about", b'{"bio":"mismatched"]'),
+            ("/api/studio/bgm", b'[{}'),
+        ]:
+            st_tj, _, _ = http_req(ep, method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=bad_j)
+            assert_eq(st_tj, 400, f"{ep} must reject truncated/mismatched JSON")
+
         gal_data = [{"id": "g1", "url": up_url, "title": "晴空美少女", "tag": "原画", "note": "精选测试", "date": "2026-11-26"}]
         st_gs, _, _ = http_req("/api/studio/gallery", method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=json.dumps(gal_data).encode())
         assert_eq(st_gs, 200, "POST /api/studio/gallery")
@@ -778,6 +795,7 @@ def test_server():
         assert not any(c["name"] == "测试相册" for c in cats_after), f"deleted category remained: {cats_after}"
         gp_after = json.loads(http_req("/api/studio/posts/studio-e2e-demo", headers=cookie_hdr)[2])
         assert_eq(gp_after["category"], "", "post category should be cleared when category deleted")
+        assert_eq(gp_after["pinned"], True, "post pinned flag must survive category deletion")
 
         # Delete test post -> 404 on frontend
         st_dp, _, _ = http_req("/api/studio/posts/studio-e2e-demo", method="DELETE", headers=cookie_hdr)

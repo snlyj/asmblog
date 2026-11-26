@@ -1527,6 +1527,15 @@ render_sitemap_xml:
     mov rdi, rsp; lea rsi, [rip + g_cfg_site_url]; mov rdx, [rip + g_cfg_site_url_len]; call sb_esc_html
     mov rdi, rsp; lea rsi, [rip + s_slash]; mov edx, 1; call sb_mem
     mov rdi, rsp; lea rsi, [rip + sm_u2]; mov edx, sm_u2_len; call sb_mem
+    # Also include curated /gallery/ and /about/ pages in sitemap
+    mov rdi, rsp; lea rsi, [rip + sm_u1]; mov edx, sm_u1_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + g_cfg_site_url]; mov rdx, [rip + g_cfg_site_url_len]; call sb_esc_html
+    mov rdi, rsp; lea rsi, [rip + s_og_gallery]; mov edx, s_og_gallery_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + sm_u2]; mov edx, sm_u2_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + sm_u1]; mov edx, sm_u1_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + g_cfg_site_url]; mov rdx, [rip + g_cfg_site_url_len]; call sb_esc_html
+    mov rdi, rsp; lea rsi, [rip + s_og_about]; mov edx, s_og_about_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + sm_u2]; mov edx, sm_u2_len; call sb_mem
 
     xor ebx, ebx
 .Lsm_loop:
@@ -1772,14 +1781,25 @@ render_simple_page:
     pop r12
     ret
 
+.globl render_gallery_page
+render_gallery_page:
+    lea rdi, [rip + s_gallery_title]; mov esi, s_gallery_title_len
+    lea rdx, [rip + s_og_gallery];    mov ecx, s_og_gallery_len
+    lea r8,  [rip + tpl_gallery];     mov r9d, tpl_gallery_len
+    jmp render_simple_page
+
+.globl render_about_page
+render_about_page:
+    lea rdi, [rip + s_about_title]; mov esi, s_about_title_len
+    lea rdx, [rip + s_og_about];    mov ecx, s_og_about_len
+    lea r8,  [rip + tpl_about];     mov r9d, tpl_about_len
+    jmp render_simple_page
+
 .globl handle_gallery
 handle_gallery:
     push r12
     mov r12, rdi
-    lea rdi, [rip + s_gallery_title]; mov esi, s_gallery_title_len
-    lea rdx, [rip + s_og_gallery];    mov ecx, s_og_gallery_len
-    lea r8,  [rip + tpl_gallery];     mov r9d, tpl_gallery_len
-    call render_simple_page
+    call render_gallery_page
     mov rdi, r12
     mov rsi, rax
     call send_html_200
@@ -1790,10 +1810,7 @@ handle_gallery:
 handle_about:
     push r12
     mov r12, rdi
-    lea rdi, [rip + s_about_title]; mov esi, s_about_title_len
-    lea rdx, [rip + s_og_about];    mov ecx, s_og_about_len
-    lea r8,  [rip + tpl_about];     mov r9d, tpl_about_len
-    call render_simple_page
+    call render_about_page
     mov rdi, r12
     mov rsi, rax
     call send_html_200

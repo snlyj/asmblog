@@ -2915,6 +2915,37 @@
   });
 
   /* =========================================================
+     Shared URL Normalization, Unsaved Button Indicator & Dual-Tier Pairing
+     ========================================================= */
+  function normalizeStudioUrl(raw, allowRelative) {
+    var s = String(raw || '').trim();
+    if (!s) return { ok: true, url: '' };
+    if (/^(javascript|data|vbscript|file):/i.test(s)) return { ok: false, url: '' };
+    if (allowRelative && s.indexOf('/') === 0 && s.indexOf('//') !== 0) return { ok: true, url: s };
+    if (/^https?:\/\//i.test(s)) return { ok: true, url: s };
+    if (/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}(\/|$|\?|#)/i.test(s)) return { ok: true, url: 'https://' + s };
+    return { ok: false, url: '' };
+  }
+
+  function setBtnDirty(btn, baseLabel, dirty) {
+    if (!btn) return;
+    btn.textContent = dirty ? (baseLabel + ' *') : baseLabel;
+  }
+
+  function findPairedGalleryUrl(baseUrl) {
+    var candidates = [];
+    if (sAvatarUrl && sAvatarUrl.value) candidates.push(sAvatarUrl.value.trim());
+    if (sBannerUrl && sBannerUrl.value) candidates.push(sBannerUrl.value.trim());
+    (state.posts || []).forEach(function (p) { if (p && p.cover) candidates.push(p.cover); });
+    (state.gallery || []).forEach(function (g) { if (g && g.url) candidates.push(g.url); });
+    for (var i = 0; i < candidates.length; i++) {
+      var u = candidates[i];
+      if (u && u.split('?')[0] === baseUrl && extractOrigUrl(u)) return u;
+    }
+    return baseUrl;
+  }
+
+  /* =========================================================
      Curated Illustration Gallery (100% Author-Picked)
      ========================================================= */
   var galDrop = document.getElementById('gal-drop');
@@ -2922,6 +2953,7 @@
   var galStatus = document.getElementById('gal-status');
   var galAdminList = document.getElementById('gal-admin-list');
   var saveGalleryBtn = document.getElementById('save-gallery-btn');
+  var SAVE_GAL_LABEL = '✦ 保存画廊';
 
   function renderGalleryAdmin() {
     if (cntGallery) cntGallery.textContent = String(state.gallery.length);
@@ -2958,6 +2990,7 @@
     if (saveGalleryBtn) saveGalleryBtn.disabled = true;
     return api('POST', '/api/studio/gallery', state.gallery)
       .then(function () {
+        setBtnDirty(saveGalleryBtn, SAVE_GAL_LABEL, false);
         if (!silentToast) showToast('精选画廊已保存并同步到前台 ✦ <a href="/gallery/" target="_blank">查看画廊 ↗</a>');
         if (cntGallery) cntGallery.textContent = String(state.gallery.length);
       })
@@ -3008,7 +3041,10 @@
       var card = e.target.closest('[data-gidx]');
       if (!fld || !card) return;
       var i = parseInt(card.getAttribute('data-gidx'), 10);
-      if (state.gallery[i]) state.gallery[i][fld] = e.target.value;
+      if (state.gallery[i]) {
+        state.gallery[i][fld] = e.target.value;
+        setBtnDirty(saveGalleryBtn, SAVE_GAL_LABEL, true);
+      }
     });
     galAdminList.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-gact]');
@@ -3019,9 +3055,11 @@
       if (act === 'up' && i > 0) {
         var tmp = state.gallery[i - 1]; state.gallery[i - 1] = state.gallery[i]; state.gallery[i] = tmp;
         renderGalleryAdmin();
+        setBtnDirty(saveGalleryBtn, SAVE_GAL_LABEL, true);
       } else if (act === 'down' && i < state.gallery.length - 1) {
         var tmp2 = state.gallery[i + 1]; state.gallery[i + 1] = state.gallery[i]; state.gallery[i] = tmp2;
         renderGalleryAdmin();
+        setBtnDirty(saveGalleryBtn, SAVE_GAL_LABEL, true);
       } else if (act === 'del') {
         state.gallery.splice(i, 1);
         renderGalleryAdmin();
@@ -3187,13 +3225,20 @@
         }
       } else if (act === 'addgal') {
         var gurl = btn.getAttribute('data-murl') || '';
-        if (state.gallery.some(function (it) { return it.url === gurl; })) {
+        var isDup = state.gallery.some(function (it) {
+          if (!it || !it.url) return false;
+          var base = it.url.split('?')[0];
+          var orig = extractOrigUrl(it.url);
+          return it.url === gurl || base === gurl || (orig && orig === gurl);
+        });
+        if (isDup) {
           showToast('这张图片已经在精选画廊里啦～');
           return;
         }
+        var pairedUrl = findPairedGalleryUrl(gurl);
         state.gallery.unshift({
           id: 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-          url: gurl,
+          url: pairedUrl,
           title: '',
           tag: '',
           note: '',
@@ -3229,12 +3274,9 @@
   var abSocialsList = document.getElementById('ab-socials-list');
   var abFriendsList = document.getElementById('ab-friends-list');
   var saveAboutBtn = document.getElementById('save-about-btn');
+  var SAVE_ABOUT_LABEL = '✦ 保存关于与友链';
 
-  function renderAboutAdmin() {
-    if (!abBio) return;
-    abBio.value = state.about.bio || '';
-    abTags.value = Array.isArray(state.about.tags) ? state.about.tags.join(', ') : '';
-
+  function renderAboutLists() {
     var socs = Array.isArray(state.about.socials) ? state.about.socials : [];
     abSocialsList.innerHTML = socs.length ? socs.map(function (s, idx) {
       return (
@@ -3264,36 +3306,65 @@
     }).join('') : '<p class="field-hint">还没有添加友链，点右上角「+ 添加小伙伴友链」点亮友链星海吧～</p>';
   }
 
+  function renderAboutAdmin() {
+    if (!abBio) return;
+    abBio.value = state.about.bio || '';
+    abTags.value = Array.isArray(state.about.tags) ? state.about.tags.join(', ') : '';
+    renderAboutLists();
+  }
+
+  if (abBio) {
+    abBio.addEventListener('input', function () {
+      state.about.bio = abBio.value || '';
+      setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
+    });
+  }
+  if (abTags) {
+    abTags.addEventListener('input', function () {
+      state.about.tags = (abTags.value || '').split(/[,，]/).map(function (x) { return x.trim(); }).filter(Boolean);
+      setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
+    });
+  }
+
   document.getElementById('ab-add-social').addEventListener('click', function () {
     if (!Array.isArray(state.about.socials)) state.about.socials = [];
     state.about.socials.push({ label: '', url: '' });
-    renderAboutAdmin();
+    renderAboutLists();
+    setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
   });
   document.getElementById('ab-add-friend').addEventListener('click', function () {
     if (!Array.isArray(state.about.friends)) state.about.friends = [];
     state.about.friends.push({ name: '', url: '', avatar: '', desc: '' });
-    renderAboutAdmin();
+    renderAboutLists();
+    setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
   });
   abSocialsList.addEventListener('input', function (e) {
     var row = e.target.closest('[data-sidx]');
     var fld = e.target.getAttribute('data-sfield');
     if (!row || !fld) return;
     var i = parseInt(row.getAttribute('data-sidx'), 10);
-    if (state.about.socials[i]) state.about.socials[i][fld] = e.target.value;
+    if (state.about.socials[i]) {
+      state.about.socials[i][fld] = e.target.value;
+      setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
+    }
   });
   abSocialsList.addEventListener('click', function (e) {
     if (!e.target.closest('[data-sdel]')) return;
     var row = e.target.closest('[data-sidx]');
     if (!row) return;
     state.about.socials.splice(parseInt(row.getAttribute('data-sidx'), 10), 1);
-    renderAboutAdmin();
+    renderAboutLists();
+    setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
   });
   abFriendsList.addEventListener('input', function (e) {
     var row = e.target.closest('[data-fidx]');
     var fld = e.target.getAttribute('data-ffield');
     if (!row || !fld) return;
     var i = parseInt(row.getAttribute('data-fidx'), 10);
-    if (state.about.friends[i]) state.about.friends[i][fld] = e.target.value;
+    if (state.about.friends[i]) {
+      state.about.friends[i][fld] = e.target.value;
+      setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
+    }
   });
   abFriendsList.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-fact]');
@@ -3303,23 +3374,70 @@
     var act = btn.getAttribute('data-fact');
     if (act === 'up' && i > 0) {
       var t = state.about.friends[i - 1]; state.about.friends[i - 1] = state.about.friends[i]; state.about.friends[i] = t;
-      renderAboutAdmin();
+      renderAboutLists();
+      setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
     } else if (act === 'down' && i < state.about.friends.length - 1) {
       var t2 = state.about.friends[i + 1]; state.about.friends[i + 1] = state.about.friends[i]; state.about.friends[i] = t2;
-      renderAboutAdmin();
+      renderAboutLists();
+      setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
     } else if (act === 'del') {
       state.about.friends.splice(i, 1);
-      renderAboutAdmin();
+      renderAboutLists();
+      setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, true);
     }
   });
   saveAboutBtn.addEventListener('click', function () {
+    var nextSocs = [];
+    for (var si = 0; si < (state.about.socials || []).length; si++) {
+      var s = state.about.socials[si];
+      if (!s) continue;
+      var sl = (s.label || '').trim();
+      var suRaw = (s.url || '').trim();
+      if (!sl && !suRaw) continue;
+      if (!sl || !suRaw) {
+        showToast('请将第 ' + (si + 1) + ' 条社交链接的平台名与网址填写完整', true);
+        return;
+      }
+      var sNorm = normalizeStudioUrl(suRaw, true);
+      if (!sNorm.ok) {
+        showToast('社交链接「' + esc(sl) + '」的网址格式不正确，请输入 https:// 开头的有效地址', true);
+        return;
+      }
+      nextSocs.push({ label: sl, url: sNorm.url });
+    }
+    var nextFriends = [];
+    for (var fi = 0; fi < (state.about.friends || []).length; fi++) {
+      var f = state.about.friends[fi];
+      if (!f) continue;
+      var fn = (f.name || '').trim();
+      var fuRaw = (f.url || '').trim();
+      var faRaw = (f.avatar || '').trim();
+      var fd = (f.desc || '').trim();
+      if (!fn && !fuRaw && !faRaw && !fd) continue;
+      if (!fn || !fuRaw) {
+        showToast('请将第 ' + (fi + 1) + ' 条友链的昵称与网站地址填写完整', true);
+        return;
+      }
+      var fNorm = normalizeStudioUrl(fuRaw, false);
+      if (!fNorm.ok) {
+        showToast('友链「' + esc(fn) + '」的网址格式不正确，请输入 https:// 开头的有效地址', true);
+        return;
+      }
+      var faNorm = normalizeStudioUrl(faRaw, true);
+      if (!faNorm.ok) {
+        showToast('友链「' + esc(fn) + '」的头像链接格式不正确', true);
+        return;
+      }
+      nextFriends.push({ name: fn, url: fNorm.url, avatar: faNorm.url, desc: fd });
+    }
     state.about.bio = abBio.value || '';
-    state.about.tags = (abTags.value || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
-    state.about.socials = (state.about.socials || []).filter(function (s) { return s && (s.label || '').trim() && (s.url || '').trim(); });
-    state.about.friends = (state.about.friends || []).filter(function (f) { return f && (f.name || '').trim() && (f.url || '').trim(); });
+    state.about.tags = (abTags.value || '').split(/[,，]/).map(function (x) { return x.trim(); }).filter(Boolean);
+    state.about.socials = nextSocs;
+    state.about.friends = nextFriends;
     saveAboutBtn.disabled = true;
     api('POST', '/api/studio/about', state.about)
       .then(function () {
+        setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, false);
         renderAboutAdmin();
         showToast('关于与友链已保存生效 ✦ <a href="/about/" target="_blank">立即查看 ↗</a>');
       })
@@ -3334,6 +3452,7 @@
   var bgmStatus = document.getElementById('bgm-status');
   var bgmAdminList = document.getElementById('bgm-admin-list');
   var saveBgmBtn = document.getElementById('save-bgm-btn');
+  var SAVE_BGM_LABEL = '✦ 保存歌单';
 
   function uploadAudioChunked(file, onProgress) {
     var MAX_AUD = 104857600;
@@ -3391,11 +3510,30 @@
   }
 
   function saveBgmNow() {
-    var clean = (state.bgm || []).filter(function (t) { return t && (t.url || '').trim(); });
+    var clean = [];
+    for (var bi = 0; bi < (state.bgm || []).length; bi++) {
+      var t = state.bgm[bi];
+      if (!t) continue;
+      var rawU = (t.url || '').trim();
+      var title = (t.title || '').trim();
+      var artist = (t.artist || '').trim();
+      if (!rawU && !title && !artist) continue;
+      if (!rawU) {
+        showToast('请填写第 ' + (bi + 1) + ' 首曲目的音频链接', true);
+        return Promise.resolve();
+      }
+      var norm = normalizeStudioUrl(rawU, true);
+      if (!norm.ok) {
+        showToast('曲目「' + esc(title || ('第 ' + (bi + 1) + ' 首')) + '」的音频链接无效', true);
+        return Promise.resolve();
+      }
+      clean.push({ title: title, artist: artist, url: norm.url });
+    }
     state.bgm = clean;
     saveBgmBtn.disabled = true;
     return api('POST', '/api/studio/bgm', state.bgm)
       .then(function () {
+        setBtnDirty(saveBgmBtn, SAVE_BGM_LABEL, false);
         renderBgmAdmin();
         showToast(state.bgm.length ? '音乐歌单已保存生效 ♪（前台左下角唱片机已就绪）' : '歌单已清空，前台已隐藏唱片机');
       })
@@ -3407,6 +3545,7 @@
   document.getElementById('bgm-add-row').addEventListener('click', function () {
     state.bgm.push({ title: '', artist: '', url: '' });
     renderBgmAdmin();
+    setBtnDirty(saveBgmBtn, SAVE_BGM_LABEL, true);
   });
   bgmFiles.addEventListener('change', function () {
     var arr = Array.prototype.slice.call(bgmFiles.files || []);
@@ -3442,7 +3581,10 @@
     var fld = e.target.getAttribute('data-bfield');
     if (!row || !fld) return;
     var i = parseInt(row.getAttribute('data-bidx'), 10);
-    if (state.bgm[i]) state.bgm[i][fld] = e.target.value;
+    if (state.bgm[i]) {
+      state.bgm[i][fld] = e.target.value;
+      setBtnDirty(saveBgmBtn, SAVE_BGM_LABEL, true);
+    }
   });
   bgmAdminList.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-bact]');
@@ -3453,12 +3595,15 @@
     if (act === 'up' && i > 0) {
       var t = state.bgm[i - 1]; state.bgm[i - 1] = state.bgm[i]; state.bgm[i] = t;
       renderBgmAdmin();
+      setBtnDirty(saveBgmBtn, SAVE_BGM_LABEL, true);
     } else if (act === 'down' && i < state.bgm.length - 1) {
       var t2 = state.bgm[i + 1]; state.bgm[i + 1] = state.bgm[i]; state.bgm[i] = t2;
       renderBgmAdmin();
+      setBtnDirty(saveBgmBtn, SAVE_BGM_LABEL, true);
     } else if (act === 'del') {
       state.bgm.splice(i, 1);
       renderBgmAdmin();
+      setBtnDirty(saveBgmBtn, SAVE_BGM_LABEL, true);
     }
   });
   saveBgmBtn.addEventListener('click', saveBgmNow);
@@ -3468,9 +3613,9 @@
       api('GET', '/api/studio/posts'),
       api('GET', '/api/studio/categories'),
       api('GET', '/api/studio/settings'),
-      fetch('/gallery.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return []; }),
-      fetch('/about.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return {}; }),
-      fetch('/bgm.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return []; }),
+      fetch('/gallery.json', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return []; }),
+      fetch('/about.json', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return {}; }),
+      fetch('/bgm.json', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return []; }),
       api('GET', '/api/studio/media').catch(function () { return []; })
     ]).then(function (res) {
       state.posts = Array.isArray(res[0]) ? res[0] : [];
@@ -3485,6 +3630,9 @@
       };
       state.bgm = Array.isArray(res[5]) ? res[5] : [];
       state.media = Array.isArray(res[6]) ? res[6] : [];
+      setBtnDirty(saveGalleryBtn, SAVE_GAL_LABEL, false);
+      setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, false);
+      setBtnDirty(saveBgmBtn, SAVE_BGM_LABEL, false);
       renderPosts();
       renderCats();
       renderGalleryAdmin();

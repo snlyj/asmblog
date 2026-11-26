@@ -93,6 +93,10 @@ p_cat_dir:      .ascii "/category"
 .equ p_cat_dir_len, . - p_cat_dir
 p_search_dir:   .ascii "/search"
 .equ p_search_dir_len, . - p_search_dir
+p_gallery_dir:  .ascii "/gallery"
+.equ p_gallery_dir_len, . - p_gallery_dir
+p_about_dir:    .ascii "/about"
+.equ p_about_dir_len, . - p_about_dir
 p_static_dir:   .ascii "/static"
 .equ p_static_dir_len, . - p_static_dir
 p_uploads_dir:  .ascii "/uploads"
@@ -101,6 +105,17 @@ p_cnt_uploads:  .ascii "content/uploads"
 .equ p_cnt_uploads_len, . - p_cnt_uploads
 p_search_json:  .ascii "/search-index.json"
 .equ p_search_json_len, . - p_search_json
+p_gal_json:     .ascii "/gallery.json"
+.equ p_gal_json_len, . - p_gal_json
+p_abt_json:     .ascii "/about.json"
+.equ p_abt_json_len, . - p_abt_json
+p_bgm_json:     .ascii "/bgm.json"
+.equ p_bgm_json_len, . - p_bgm_json
+src_gal_json:   .asciz "content/gallery.json"
+src_abt_json:   .asciz "content/about.json"
+src_bgm_json:   .asciz "content/bgm.json"
+def_empty_arr:  .ascii "[]"
+def_empty_obj:  .ascii "{}"
 p_rss_xml:      .ascii "/rss.xml"
 .equ p_rss_xml_len, . - p_rss_xml
 p_sitemap_xml:  .ascii "/sitemap.xml"
@@ -677,6 +692,38 @@ parse_common_opts:
     pop rbx
     ret
 
+# build_copy_or_def(rdi=out_ptr, rsi=out_len, rdx=sub_ptr, rcx=sub_len, r8=src_cstr, r9=def_ptr)
+build_copy_or_def:
+    push r12
+    push r13
+    sub rsp, 40           # 2 pushes + ret = 24, +40 = 64 (16B aligned)
+    mov r12, r8
+    mov r13, r9
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    lea rdi, [rsp + 32]; lea rsi, [rip + cli_path1]; mov edx, 1023; call sb_init
+    pop rsi; pop rdx
+    lea rdi, [rsp + 16]; call sb_mem
+    pop rsi; pop rdx
+    mov rdi, rsp; call sb_mem
+    mov rdi, rsp; xor esi, esi; call sb_byte
+    mov rdi, r12
+    lea rsi, [rip + cli_path1]
+    call copy_file_stream
+    test rax, rax
+    jns .Lbcod_ret
+    lea rdi, [rip + cli_path1]
+    mov rsi, r13
+    mov edx, 2
+    call write_file_direct
+.Lbcod_ret:
+    add rsp, 40
+    pop r13
+    pop r12
+    ret
+
 # do_cmd_serve() -> rax=exit code
 do_cmd_serve:
     mov rdi, [rip + cli_opt_dir]
@@ -772,6 +819,8 @@ do_cmd_build:
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_tag_dir];    mov ecx, p_tag_dir_len;    call build_mkdir_sub
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_cat_dir];    mov ecx, p_cat_dir_len;    call build_mkdir_sub
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_search_dir]; mov ecx, p_search_dir_len; call build_mkdir_sub
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_gallery_dir]; mov ecx, p_gallery_dir_len; call build_mkdir_sub
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_about_dir];  mov ecx, p_about_dir_len;  call build_mkdir_sub
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_static_dir]; mov ecx, p_static_dir_len; call build_mkdir_sub
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_uploads_dir]; mov ecx, p_uploads_dir_len; call build_mkdir_sub
 
@@ -960,6 +1009,33 @@ do_cmd_build:
     mov rdi, rsp; lea rsi, [rip + p_index_html]; mov edx, p_index_html_len; call sb_mem
     mov rdi, rsp; xor esi, esi; call sb_byte
     lea rdi, [rip + cli_path1]; mov rsi, r14; mov rdx, r15; call write_file_direct
+
+    # 7b. dist/gallery/index.html & dist/about/index.html
+    call render_gallery_page
+    mov r14, rax; mov r15, rdx
+    mov rdi, rsp; lea rsi, [rip + cli_path1]; mov edx, 1023; call sb_init
+    mov rdi, rsp; mov rsi, r12; mov rdx, r13; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + p_gallery_dir]; mov edx, p_gallery_dir_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + p_index_html]; mov edx, p_index_html_len; call sb_mem
+    mov rdi, rsp; xor esi, esi; call sb_byte
+    lea rdi, [rip + cli_path1]; mov rsi, r14; mov rdx, r15; call write_file_direct
+
+    call render_about_page
+    mov r14, rax; mov r15, rdx
+    mov rdi, rsp; lea rsi, [rip + cli_path1]; mov edx, 1023; call sb_init
+    mov rdi, rsp; mov rsi, r12; mov rdx, r13; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + p_about_dir]; mov edx, p_about_dir_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + p_index_html]; mov edx, p_index_html_len; call sb_mem
+    mov rdi, rsp; xor esi, esi; call sb_byte
+    lea rdi, [rip + cli_path1]; mov rsi, r14; mov rdx, r15; call write_file_direct
+
+    # 7c. dist/gallery.json, dist/about.json, dist/bgm.json (copy if present, else empty JSON)
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_gal_json]; mov ecx, p_gal_json_len
+    lea r8, [rip + src_gal_json]; lea r9, [rip + def_empty_arr]; call build_copy_or_def
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_abt_json]; mov ecx, p_abt_json_len
+    lea r8, [rip + src_abt_json]; lea r9, [rip + def_empty_obj]; call build_copy_or_def
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_bgm_json]; mov ecx, p_bgm_json_len
+    lea r8, [rip + src_bgm_json]; lea r9, [rip + def_empty_arr]; call build_copy_or_def
 
     # 8. dist/search-index.json
     call render_search_index_json
