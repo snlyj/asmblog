@@ -220,6 +220,7 @@
 .equ POST_COVER_LEN,        288
 .equ POST_CAT_PTR,          296       # optional category name
 .equ POST_CAT_LEN,          304
+.equ POST_PINNED,           312       # u64 (1 if pinned to top of feed)
 .equ POST_SIZE,             320
 
 # --- tag_t / cat_t (24 bytes) ---

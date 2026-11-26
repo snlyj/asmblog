@@ -219,6 +219,13 @@ def test_server():
             "/tag/asmblog/",
             "/tag/" + urllib.parse.quote("静态博客") + "/",
             "/search?q=assembly",
+            "/gallery",
+            "/gallery/",
+            "/about",
+            "/about/",
+            "/gallery.json",
+            "/about.json",
+            "/bgm.json",
             "/search-index.json",
             "/rss.xml",
             "/sitemap.xml",
@@ -306,19 +313,19 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v14 = http_req("/static/sky-ribbon.css?v=14")
+        st_imm, hdrs_imm, css_v15 = http_req("/static/sky-ribbon.css?v=15")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v14)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v15)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
-        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
+        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
             assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v14 = http_req("/static/sky-ribbon.js?v=14")
+        st_js, _, js_v15 = http_req("/static/sky-ribbon.js?v=15")
         assert_eq(st_js, 200, "versioned static js 200")
-        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart"):
-            assert required_js in js_v14, f"missing expected UI JS feature: {required_js!r}"
+        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"initGallery", b"initAbout", b"initBgmPlayer", b"pauseBgm", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart"):
+            assert required_js in js_v15, f"missing expected UI JS feature: {required_js!r}"
 
         # Open Graph / Twitter Card social preview meta + zero-bloat Giscus hidden by default
         assert 'property="og:type" content="website"' in home_txt
@@ -460,7 +467,7 @@ def test_server():
         st_txt = st_page.decode("utf-8")
         assert "作者秘密写作室" in st_txt
         assert "crop-modal" in st_txt and "crop-stage" in st_txt and "tab-settings" in st_txt, "studio UI features missing"
-        for required_st in ("draft-restore-bar", "upload-progress-wrap", "posts-filter-bar", "studio-theme-btn", "word-count-badge", "data-toggle-draft"):
+        for required_st in ("draft-restore-bar", "upload-progress-wrap", "posts-filter-bar", "studio-theme-btn", "word-count-badge", "data-toggle-draft", "f-pinned", "tab-gallery", "tab-media", "tab-about", "tab-bgm", "media-clean-btn"):
             assert required_st in st_txt, f"missing Studio UX feature: {required_st}"
 
         # Must block unauthenticated Studio API requests (including forged raw SHA256 hash cookie!)
@@ -473,6 +480,12 @@ def test_server():
             ("GET", "/api/studio/settings"),
             ("POST", "/api/studio/settings"),
             ("POST", "/api/studio/upload"),
+            ("POST", "/api/studio/upload-audio"),
+            ("POST", "/api/studio/gallery"),
+            ("POST", "/api/studio/about"),
+            ("POST", "/api/studio/bgm"),
+            ("GET", "/api/studio/media"),
+            ("POST", "/api/studio/media/delete"),
             ("DELETE", "/api/studio/posts/welcome-to-asmblog"),
         ]:
             st_u, _, _ = http_req(u, method=m, headers=forged_hdr, data=(b"{}" if m == "POST" else None))
@@ -633,16 +646,17 @@ def test_server():
         cats = json.loads(http_req("/api/studio/categories", headers=cookie_hdr)[2])
         assert any(c["name"] == "测试相册" for c in cats), f"new category missing: {cats}"
 
-        # Publish post with cover + category + inline uploaded image + inline uploaded video
+        # Publish PINNED post with older date (must float ABOVE newer 2026 posts!) + cover + inline image + video
         post_payload = {
             "title": "测试图文日记",
             "slug": "studio-e2e-demo",
-            "date": "2026-11-24",
+            "date": "2020-01-01",
             "category": "测试相册",
             "tags": "图文, 测试",
             "summary": "一篇带封面图与正文插图的测试文章",
             "cover": up_url,
             "draft": "false",
+            "pinned": "true",
             "content": f"## 图文测试\n\n这里是一张插图：\n\n![可爱插图]({up_url})\n\n这里是一段视频：\n\n![精彩片段]({vid_url}?poster={up_url})\n",
         }
         st_sp, _, sp_body = http_req(
@@ -654,26 +668,105 @@ def test_server():
         assert_eq(st_sp, 200, "publish studio post")
         assert_eq(json.loads(sp_body)["slug"], "studio-e2e-demo")
 
+        # Verify pinned post floats FIRST on homepage ahead of newer 2026 posts & renders pin-badge
+        pin_home = http_req("/")[2].decode("utf-8")
+        assert "pin-badge" in pin_home and "📌 置顶" in pin_home, "pin-badge missing on homepage"
+        assert pin_home.index("测试图文日记") < pin_home.index("欢迎使用 AsmBlog"), "pinned 2020 post must sort ahead of newer posts"
+
         # Verify public rendering on post detail and category page (including HTML5 <video>)
         st_vp, _, vp_html = http_req("/post/studio-e2e-demo/")
         assert_eq(st_vp, 200, "public view of studio post")
         vp_txt = vp_html.decode("utf-8")
-        assert "测试图文日记" in vp_txt and f'src="{up_url}"' in vp_txt and "测试相册" in vp_txt
+        assert "测试图文日记" in vp_txt and f'src="{up_url}"' in vp_txt and "测试相册" in vp_txt and "pin-badge" in vp_txt
         assert f'<video class="prose-video" src="{vid_url}?poster={up_url}" title="精彩片段" controls playsinline preload="metadata"></video>' in vp_txt, "HTML5 video tag missing"
 
         st_vc, _, vc_html = http_req("/category/" + urllib.parse.quote("测试相册") + "/")
         assert_eq(st_vc, 200, "new category page")
         assert "测试图文日记" in vc_html.decode("utf-8")
 
-        # Verify GET single post returns raw markdown content for editing
+        # Verify GET single post returns raw markdown content & pinned=True for editing
         st_gp, _, gp_body = http_req("/api/studio/posts/studio-e2e-demo", headers=cookie_hdr)
         assert_eq(st_gp, 200, "studio get post")
         gp_obj = json.loads(gp_body)
         assert_eq(gp_obj["cover"], up_url)
         assert_eq(gp_obj["category"], "测试相册")
+        assert_eq(gp_obj["pinned"], True, "pinned flag round-trip")
         assert f"![可爱插图]({up_url})" in gp_obj["content"]
 
-        # Delete custom category -> disappears from category list AND cleared from post
+        # Curated Gallery, About/Friends, Audio BGM Upload + Media Library Reference & Cleanup E2E
+        gal_path = os.path.join(SITE, "content/gallery.json")
+        abt_path = os.path.join(SITE, "content/about.json")
+        bgm_path = os.path.join(SITE, "content/bgm.json")
+        temp_files.extend([gal_path, abt_path, bgm_path])
+
+        # 1) Curated Gallery save & public read
+        gal_data = [{"id": "g1", "url": up_url, "title": "晴空美少女", "tag": "原画", "note": "精选测试", "date": "2026-11-26"}]
+        st_gs, _, _ = http_req("/api/studio/gallery", method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=json.dumps(gal_data).encode())
+        assert_eq(st_gs, 200, "POST /api/studio/gallery")
+        assert_eq(json.loads(http_req("/gallery.json")[2])[0]["title"], "晴空美少女", "GET /gallery.json")
+        assert "精选画廊" in http_req("/gallery/")[2].decode("utf-8")
+
+        # 2) About & Friends save & public read
+        abt_data = {"bio": "你好晴空\n第二行简介", "tags": ["二次元", "插画"], "socials": [{"label": "GitHub", "url": "https://github.com/snlyj"}], "friends": [{"name": "晴空友链", "url": "https://example.com", "avatar": up_url, "desc": "好朋友"}]}
+        st_as, _, _ = http_req("/api/studio/about", method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=json.dumps(abt_data).encode())
+        assert_eq(st_as, 200, "POST /api/studio/about")
+        assert_eq(json.loads(http_req("/about.json")[2])["friends"][0]["name"], "晴空友链", "GET /about.json")
+        assert "friends-grid" in http_req("/about/")[2].decode("utf-8")
+
+        # 3) Audio MP3 upload + audio/mpeg MIME + Range 206 + BGM playlist save
+        fake_mp3 = b"ID3\x03\x00\x00\x00\x00\x00\x00" + (b"\xff\xfb\x90\x00" * 16)
+        st_au, _, au_body = http_req("/api/studio/upload-audio?done=1", method="POST", headers={**cookie_hdr, "Content-Type": "application/octet-stream"}, data=fake_mp3)
+        assert_eq(st_au, 200, "upload MP3 audio 200")
+        aud_url = json.loads(au_body)["url"]
+        assert aud_url.endswith(".mp3"), f"expected .mp3 url, got {aud_url}"
+        aud_disk = os.path.join(SITE, "content", aud_url.lstrip("/"))
+        temp_files.append(aud_disk)
+        st_am, ah_m, ab_m = http_req(aud_url, headers={"Range": "bytes=0-9"})
+        assert_eq(st_am, 206, "audio Range 206")
+        assert "audio/mpeg" in ah_m.get("Content-Type", ""), f"bad audio mime: {ah_m}"
+        assert_eq(ab_m, fake_mp3[:10], "audio range bytes")
+
+        bgm_data = [{"title": "晴空微风", "artist": "Sakura", "url": aud_url}]
+        st_bs, _, _ = http_req("/api/studio/bgm", method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=json.dumps(bgm_data).encode())
+        assert_eq(st_bs, 200, "POST /api/studio/bgm")
+        assert_eq(json.loads(http_req("/bgm.json")[2])[0]["title"], "晴空微风", "GET /bgm.json")
+
+        # 4) Media Library reference scan & safe orphan/unused delete
+        st_uu, _, uu_body = http_req("/api/studio/upload", method="POST", headers={**cookie_hdr, "Content-Type": "image/png"}, data=tiny_png)
+        assert_eq(st_uu, 201, "upload unreferenced PNG")
+        unused_name = json.loads(uu_body)["url"].rsplit("/", 1)[-1]
+        orphan_part_name = ".orphan-test.mp4.part"
+        orphan_part_disk = os.path.join(SITE, "content/uploads", orphan_part_name)
+        with open(orphan_part_disk, "wb") as pf:
+            pf.write(b"partial")
+        temp_files.extend([os.path.join(SITE, "content/uploads", unused_name), orphan_part_disk])
+
+        st_ml, _, ml_body = http_req("/api/studio/media", headers=cookie_hdr)
+        assert_eq(st_ml, 200, "GET /api/studio/media")
+        media_by_name = {m["name"]: m for m in json.loads(ml_body)}
+        up_name = up_url.rsplit("/", 1)[-1]
+        aud_name = aud_url.rsplit("/", 1)[-1]
+        assert media_by_name[up_name]["used"] is True and media_by_name[up_name]["part"] is False
+        assert media_by_name[aud_name]["used"] is True and media_by_name[aud_name]["part"] is False
+        assert media_by_name[unused_name]["used"] is False and media_by_name[unused_name]["part"] is False
+        assert media_by_name[orphan_part_name]["used"] is False and media_by_name[orphan_part_name]["part"] is True
+
+        # Reject protected/unsafe delete names; allow deleting unused & orphan .part
+        for bad_n in (".gitkeep", "../config.ini", "a/b.png", "."):
+            st_bd, _, _ = http_req("/api/studio/media/delete", method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=json.dumps({"name": bad_n}).encode())
+            assert_eq(st_bd, 400, f"media delete must reject {bad_n!r}")
+        for ok_n in (unused_name, orphan_part_name):
+            st_od, _, _ = http_req("/api/studio/media/delete", method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=json.dumps({"name": ok_n}).encode())
+            assert_eq(st_od, 200, f"media delete {ok_n}")
+        assert not os.path.exists(orphan_part_disk)
+        for p_clean in (gal_path, abt_path, bgm_path, aud_disk):
+            if os.path.exists(p_clean):
+                os.unlink(p_clean)
+                temp_files.remove(p_clean)
+        temp_files.remove(orphan_part_disk)
+        temp_files.remove(os.path.join(SITE, "content/uploads", unused_name))
+
+        # Delete custom category -> disappears from category list AND cleared from post (preserving pinned!)
         st_cd, _, _ = http_req(
             "/api/studio/categories/delete",
             method="POST",

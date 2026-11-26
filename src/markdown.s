@@ -14,6 +14,7 @@ fm_k_date:      .ascii "date"
 fm_k_summary:   .ascii "summary"
 fm_k_tags:      .ascii "tags"
 fm_k_draft:     .ascii "draft"
+fm_k_pinned:    .ascii "pinned"
 fm_k_cover:     .ascii "cover"
 fm_k_category:  .ascii "category"
 fm_v_true:      .ascii "true"
@@ -399,7 +400,7 @@ parse_frontmatter:
     mov ecx, 8
     call xslice_eq_ci
     test eax, eax
-    jz .Lpf_kv_done
+    jz .Lpf_k_pinned
     cmp qword ptr [rsp + 0], 0
     je .Lpf_kv_done
     mov rdi, [rsp + 8]
@@ -408,6 +409,32 @@ parse_frontmatter:
     mov [r14 + POST_CAT_PTR], rax
     mov rax, [rsp + 0]
     mov [r14 + POST_CAT_LEN], rax
+    jmp .Lpf_kv_done
+
+.Lpf_k_pinned:
+    mov rdi, [rsp + 24]
+    mov rsi, [rsp + 16]
+    lea rdx, [rip + fm_k_pinned]
+    mov ecx, 6
+    call xslice_eq_ci
+    test eax, eax
+    jz .Lpf_kv_done
+    mov rdi, [rsp + 8]
+    mov rsi, [rsp + 0]
+    lea rdx, [rip + fm_v_true]
+    mov ecx, 4
+    call xslice_eq_ci
+    test eax, eax
+    jnz .Lpf_set_pin
+    mov rdi, [rsp + 8]
+    mov rsi, [rsp + 0]
+    lea rdx, [rip + fm_v_one]
+    mov ecx, 1
+    call xslice_eq
+    test eax, eax
+    jz .Lpf_kv_done
+.Lpf_set_pin:
+    mov qword ptr [r14 + POST_PINNED], 1
 
 .Lpf_kv_done:
     add rsp, 32

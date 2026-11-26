@@ -188,8 +188,10 @@
      --------------------------------------------------------- */
   function matchNavKey(pathname) {
     var p = pathname || window.location.pathname;
+    if (p.indexOf('/gallery') === 0) return '/gallery';
     if (p.indexOf('/archive') === 0) return '/archive';
     if (p.indexOf('/tags') === 0 || p.indexOf('/tag/') === 0) return '/tags';
+    if (p.indexOf('/about') === 0) return '/about';
     if (p.indexOf('/search') === 0) return '/search';
     return '/';
   }
@@ -322,7 +324,7 @@
   document.addEventListener('pointerdown', function (e) {
     if (reducedMotion || root.getAttribute('data-fx') === 'off') return;
     if (e.button !== 0) return;
-    if (e.target && e.target.closest && e.target.closest('#img-lightbox, #cmd-search, #toc-sheet')) return;
+    if (e.target && e.target.closest && e.target.closest('#img-lightbox, #cmd-search, #toc-sheet, #bgm-dock')) return;
     var count = 5;
     for (var i = 0; i < count; i++) {
       var sp = document.createElement('span');
@@ -779,6 +781,7 @@
   function initLightbox() {
     bindLightboxGroup('.article-cover, .prose img');
     bindLightboxGroup('.hero-banner-img');
+    bindLightboxGroup('.about-avatar-img');
     bindLightboxGroup('.not-found-img');
   }
 
@@ -830,8 +833,9 @@
           }
         } catch (_) {}
       }
-      // Mutual auto-pause so multi-video posts never overlap audio
+      // Mutual auto-pause so multi-video posts and BGM never overlap audio
       vid.addEventListener('play', function () {
+        if (typeof pauseBgm === 'function') pauseBgm();
         document.querySelectorAll('video').forEach(function (other) {
           if (other !== vid && !other.paused) {
             try { other.pause(); } catch (_) {}
@@ -1542,6 +1546,319 @@
     }
   }
 
+  function isSafeFrontUrl(u) {
+    var s = String(u || '').trim();
+    return s.indexOf('/') === 0 || /^https?:\/\//i.test(s);
+  }
+
+  /* Curated Illustration Gallery (/gallery/) */
+  function initGallery() {
+    var grid = document.getElementById('gallery-grid');
+    var bar = document.getElementById('gallery-filter-bar');
+    if (!grid || grid.dataset.galInit) return;
+    grid.dataset.galInit = '1';
+
+    fetch('/gallery.json')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var all = (Array.isArray(data) ? data : []).filter(function (it) {
+          return it && isSafeFrontUrl(it.url);
+        });
+        if (!all.length) {
+          if (bar) bar.innerHTML = '';
+          grid.innerHTML = '<div class="empty-state">画廊里还没有放进精选作品哦～ 博主可以在创作后台「🖼️ 精选画廊」亲自挑选美图放进来 ✦</div>';
+          recalcMetrics();
+          return;
+        }
+
+        var activeTag = '';
+        var tagCounts = {};
+        all.forEach(function (it) {
+          var t = String(it.tag || '').trim();
+          if (t) tagCounts[t] = (tagCounts[t] || 0) + 1;
+        });
+        var tagList = Object.keys(tagCounts);
+
+        function renderBar() {
+          if (!bar) return;
+          if (!tagList.length) {
+            bar.innerHTML = '<span class="cat-pill is-active">✦ 全部精选 <span class="cat-pill-cnt">' + all.length + '</span></span>';
+            return;
+          }
+          var html = '<button type="button" class="cat-pill' + (!activeTag ? ' is-active' : '') + '" data-gal-tag="">✦ 全部 <span class="cat-pill-cnt">' + all.length + '</span></button>';
+          tagList.forEach(function (t) {
+            html += '<button type="button" class="cat-pill' + (activeTag === t ? ' is-active' : '') + '" data-gal-tag="' + esc(t) + '">#' + esc(t) + ' <span class="cat-pill-cnt">' + tagCounts[t] + '</span></button>';
+          });
+          bar.innerHTML = html;
+          bar.querySelectorAll('[data-gal-tag]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              activeTag = btn.getAttribute('data-gal-tag') || '';
+              renderBar();
+              renderCards();
+            });
+          });
+          syncCatBarFade();
+        }
+
+        function renderCards() {
+          var shown = activeTag
+            ? all.filter(function (it) { return String(it.tag || '').trim() === activeTag; })
+            : all;
+          if (!shown.length) {
+            grid.innerHTML = '<div class="empty-state">这个分类下暂时没有精选作品～</div>';
+            recalcMetrics();
+            return;
+          }
+          var lbItems = shown.map(function (it) {
+            var cap = String(it.title || '').trim();
+            var note = String(it.note || '').trim();
+            return {
+              src: it.url,
+              orig: extractOrigUrl(it.url),
+              alt: cap && note ? (cap + ' · ' + note) : (cap || note || '精选作品')
+            };
+          });
+          grid.innerHTML = shown.map(function (it, idx) {
+            var title = String(it.title || '').trim();
+            var tag = String(it.tag || '').trim();
+            var note = String(it.note || '').trim();
+            var hasInfo = !!(title || tag || note);
+            var infoHtml = hasInfo
+              ? '<div class="gal-info">' +
+                ((title || tag)
+                  ? '<div class="gal-top">' + (title ? '<p class="gal-title">' + esc(title) + '</p>' : '<span></span>') + (tag ? '<span class="gal-tag">#' + esc(tag) + '</span>' : '') + '</div>'
+                  : '') +
+                (note ? '<p class="gal-note">' + esc(note) + '</p>' : '') +
+                '</div>'
+              : '';
+            return (
+              '<figure class="gal-card" data-gal-idx="' + idx + '">' +
+              '<img class="gal-img" src="' + esc(it.url) + '" alt="' + esc(title || '精选作品') + '" loading="lazy" decoding="async">' +
+              infoHtml +
+              '</figure>'
+            );
+          }).join('');
+
+          grid.querySelectorAll('.gal-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+              var i = parseInt(card.getAttribute('data-gal-idx') || '0', 10);
+              openLightbox(lbItems, i);
+            });
+          });
+          grid.querySelectorAll('.gal-img').forEach(function (im) {
+            im.addEventListener('load', recalcMetrics, { once: true });
+          });
+          recalcMetrics();
+        }
+
+        renderBar();
+        renderCards();
+      })
+      .catch(function () {
+        grid.innerHTML = '<div class="empty-state">画廊加载失败，请稍后刷新重试～</div>';
+      });
+  }
+
+  /* About Me & Friends Wall (/about/) */
+  function initAbout() {
+    var bioEl = document.getElementById('about-bio');
+    var friendsGrid = document.getElementById('friends-grid');
+    if (!bioEl || !friendsGrid || bioEl.dataset.aboutInit) return;
+    bioEl.dataset.aboutInit = '1';
+
+    fetch('/about.json')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var cfg = (data && typeof data === 'object') ? data : {};
+        var bio = String(cfg.bio || '').trim();
+        if (bio) {
+          bioEl.innerHTML = bio.split(/\n+/).map(function (line) {
+            return line.trim() ? ('<p>' + esc(line.trim()) + '</p>') : '';
+          }).join('');
+        }
+        var tagsEl = document.getElementById('about-tags');
+        if (tagsEl) {
+          var tags = Array.isArray(cfg.tags) ? cfg.tags : [];
+          tagsEl.innerHTML = tags
+            .map(function (t) { return String(t || '').trim(); })
+            .filter(Boolean)
+            .map(function (t) { return '<span class="tag-chip">#' + esc(t) + '</span>'; })
+            .join('');
+        }
+        var socEl = document.getElementById('about-socials');
+        if (socEl) {
+          var socials = (Array.isArray(cfg.socials) ? cfg.socials : []).filter(function (s) {
+            return s && s.label && isSafeFrontUrl(s.url);
+          });
+          socEl.innerHTML = socials.map(function (s) {
+            return '<a class="social-pill" href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">✦ ' + esc(s.label) + ' ↗</a>';
+          }).join('');
+        }
+        var friends = (Array.isArray(cfg.friends) ? cfg.friends : []).filter(function (f) {
+          return f && f.name && isSafeFrontUrl(f.url);
+        });
+        var cntEl = document.getElementById('friends-count');
+        if (cntEl) cntEl.textContent = friends.length ? (friends.length + ' 位小伙伴') : '欢迎交换友链';
+        if (!friends.length) {
+          friendsGrid.innerHTML = '<div class="empty-state">友链星海等待点亮中～ 可在创作后台「🎀 关于与友链」添加小伙伴的站点 ✦</div>';
+        } else {
+          friendsGrid.innerHTML = friends.map(function (f) {
+            var av = isSafeFrontUrl(f.avatar) ? f.avatar : '/static/avatar.webp?v=3&orig=/static/avatar.jpg';
+            return (
+              '<a class="friend-card" href="' + esc(f.url) + '" target="_blank" rel="noopener noreferrer">' +
+              '<img class="friend-avatar" src="' + esc(av) + '" alt="' + esc(f.name) + '" loading="lazy" decoding="async">' +
+              '<div class="friend-info">' +
+              '<p class="friend-name">' + esc(f.name) + '</p>' +
+              '<p class="friend-desc">' + esc(f.desc || f.url) + '</p>' +
+              '</div></a>'
+            );
+          }).join('');
+        }
+        recalcMetrics();
+      })
+      .catch(function () {
+        friendsGrid.innerHTML = '<div class="empty-state">暂时未能读取关于与友链信息～</div>';
+      });
+  }
+
+  /* PJAX Continuous Mini BGM Player (mounted outside #pjax-stage; never auto-plays!) */
+  var bgm = { el: null, audio: null, list: [], idx: 0, loopOne: false, playing: false, inited: false };
+
+  function pauseBgm() {
+    if (bgm.audio && !bgm.audio.paused) {
+      try { bgm.audio.pause(); } catch (_) {}
+    }
+  }
+
+  function fmtAudioTime(sec) {
+    if (!sec || !isFinite(sec)) return '0:00';
+    var m = Math.floor(sec / 60);
+    var s = Math.floor(sec % 60);
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function initBgmPlayer() {
+    if (bgm.inited) return;
+    bgm.inited = true;
+
+    fetch('/bgm.json')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var tracks = (Array.isArray(data) ? data : []).filter(function (t) {
+          return t && isSafeFrontUrl(t.url);
+        });
+        if (!tracks.length) return;
+        bgm.list = tracks;
+
+        var dock = document.createElement('div');
+        dock.id = 'bgm-dock';
+        dock.className = 'bgm-dock';
+        dock.innerHTML =
+          '<button type="button" class="bgm-disc" title="星梦唱片机 · 点击展开/收起" aria-label="展开音乐播放器"><span class="bgm-disc-glyph">♪</span></button>' +
+          '<div class="bgm-panel" role="region" aria-label="站内音乐播放器">' +
+          '<div class="bgm-head"><div class="bgm-meta"><p class="bgm-title"></p><p class="bgm-artist"></p></div><button type="button" class="bgm-close" aria-label="收起">✕</button></div>' +
+          '<div class="bgm-bar" title="点击跳转播放进度"><div class="bgm-bar-fill"></div></div>' +
+          '<div class="bgm-ctrl-row">' +
+          '<div class="bgm-btns">' +
+          '<button type="button" class="bgm-btn" data-bgm="prev" title="上一首">⏮</button>' +
+          '<button type="button" class="bgm-btn bgm-btn-play" data-bgm="play" title="播放 / 暂停">▶</button>' +
+          '<button type="button" class="bgm-btn" data-bgm="next" title="下一首">⏭</button>' +
+          '<button type="button" class="bgm-btn" data-bgm="loop" title="切换列表循环 / 单曲循环">🔁</button>' +
+          '</div>' +
+          '<span class="bgm-time">0:00 / 0:00</span>' +
+          '</div></div>';
+        document.body.appendChild(dock);
+
+        var audio = new Audio();
+        audio.preload = 'none';
+        bgm.el = dock;
+        bgm.audio = audio;
+
+        var discBtn = dock.querySelector('.bgm-disc');
+        var closeBtn = dock.querySelector('.bgm-close');
+        var titleEl = dock.querySelector('.bgm-title');
+        var artistEl = dock.querySelector('.bgm-artist');
+        var barEl = dock.querySelector('.bgm-bar');
+        var fillEl = dock.querySelector('.bgm-bar-fill');
+        var timeEl = dock.querySelector('.bgm-time');
+        var playBtn = dock.querySelector('[data-bgm="play"]');
+        var prevBtn = dock.querySelector('[data-bgm="prev"]');
+        var nextBtn = dock.querySelector('[data-bgm="next"]');
+        var loopBtn = dock.querySelector('[data-bgm="loop"]');
+
+        function loadTrack(i, autoPlay) {
+          bgm.idx = (i + bgm.list.length) % bgm.list.length;
+          var tr = bgm.list[bgm.idx];
+          titleEl.textContent = tr.title || ('曲目 ' + (bgm.idx + 1));
+          artistEl.textContent = (tr.artist || 'BGM') + (bgm.list.length > 1 ? (' · ' + (bgm.idx + 1) + '/' + bgm.list.length) : '');
+          fillEl.style.width = '0%';
+          timeEl.textContent = '0:00 / 0:00';
+          audio.src = tr.url;
+          if (autoPlay) {
+            audio.play().catch(function () { showToast('请再点一下播放按钮启动音乐 ♪'); });
+          }
+        }
+
+        function syncPlayState() {
+          bgm.playing = !audio.paused && !audio.ended;
+          dock.classList.toggle('is-playing', bgm.playing);
+          playBtn.textContent = bgm.playing ? '⏸' : '▶';
+        }
+
+        discBtn.addEventListener('click', function () {
+          dock.classList.toggle('is-open');
+        });
+        closeBtn.addEventListener('click', function () {
+          dock.classList.remove('is-open');
+        });
+        playBtn.addEventListener('click', function () {
+          if (!audio.src) loadTrack(bgm.idx, true);
+          else if (audio.paused) audio.play().catch(function () {});
+          else audio.pause();
+        });
+        prevBtn.addEventListener('click', function () { loadTrack(bgm.idx - 1, true); });
+        nextBtn.addEventListener('click', function () { loadTrack(bgm.idx + 1, true); });
+        loopBtn.addEventListener('click', function () {
+          bgm.loopOne = !bgm.loopOne;
+          loopBtn.classList.toggle('is-active', bgm.loopOne);
+          loopBtn.textContent = bgm.loopOne ? '🔂' : '🔁';
+          showToast(bgm.loopOne ? '已切换为单曲循环 🔂' : '已切换为列表循环 🔁');
+        });
+        barEl.addEventListener('click', function (e) {
+          if (!audio.duration || !isFinite(audio.duration)) return;
+          var rect = barEl.getBoundingClientRect();
+          var ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+          audio.currentTime = ratio * audio.duration;
+        });
+
+        audio.addEventListener('play', syncPlayState);
+        audio.addEventListener('pause', syncPlayState);
+        audio.addEventListener('timeupdate', function () {
+          var dur = audio.duration || 0;
+          var cur = audio.currentTime || 0;
+          if (dur > 0 && isFinite(dur)) {
+            fillEl.style.width = ((cur / dur) * 100).toFixed(2) + '%';
+            timeEl.textContent = fmtAudioTime(cur) + ' / ' + fmtAudioTime(dur);
+          }
+        });
+        audio.addEventListener('ended', function () {
+          if (bgm.loopOne) {
+            audio.currentTime = 0;
+            audio.play().catch(function () {});
+          } else {
+            loadTrack(bgm.idx + 1, true);
+          }
+        });
+        audio.addEventListener('error', function () {
+          syncPlayState();
+          showToast('当前音频无法加载，请检查链接', true);
+        });
+
+        loadTrack(0, false);
+      })
+      .catch(function () {});
+  }
+
   function hydratePage(animate) {
     if (animate) animateStageCards();
     enhanceImages();
@@ -1550,6 +1867,8 @@
     initArticleExtras();
     initArchiveYears();
     initComments();
+    initGallery();
+    initAbout();
     initLightbox();
     bindAvatarBoing();
     initSearch();
@@ -1804,6 +2123,7 @@
     history.replaceState({ url: window.location.href, scrollY: window.scrollY || 0 }, '', window.location.href);
   } catch (_) {}
   hydratePage(false);
+  initBgmPlayer();
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { updateNavState(); });
   }

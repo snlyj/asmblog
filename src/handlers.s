@@ -116,6 +116,9 @@ k_cover:         .ascii "cover"
 .equ k_cover_len, . - k_cover
 k_category:      .ascii "category"
 .equ k_category_len, . - k_category
+k_pinned:        .ascii "pinned"
+.equ k_pinned_len, . - k_pinned
+s_one_lit:       .ascii "1"
 k_query:         .ascii "query"
 .equ k_query_len, . - k_query
 k_name:          .ascii "name"
@@ -145,6 +148,10 @@ tpl_category:    .ascii "category"
 .equ tpl_category_len, . - tpl_category
 tpl_search:      .ascii "search"
 .equ tpl_search_len, . - tpl_search
+tpl_gallery:     .ascii "gallery"
+.equ tpl_gallery_len, . - tpl_gallery
+tpl_about:       .ascii "about"
+.equ tpl_about_len, . - tpl_about
 tpl_404:         .ascii "404"
 .equ tpl_404_len, . - tpl_404
 
@@ -156,8 +163,21 @@ s_tags_title:    .ascii "标签"
 .equ s_tags_title_len, . - s_tags_title
 s_search_title:  .ascii "搜索"
 .equ s_search_title_len, . - s_search_title
+s_gallery_title: .ascii "精选画廊"
+.equ s_gallery_title_len, . - s_gallery_title
+s_about_title:   .ascii "关于与友链"
+.equ s_about_title_len, . - s_about_title
 s_404_title:     .ascii "404 Not Found"
 .equ s_404_title_len, . - s_404_title
+p_gallery_json:  .asciz "content/gallery.json"
+p_about_json:    .asciz "content/about.json"
+p_bgm_json:      .asciz "content/bgm.json"
+s_og_gallery:    .ascii "/gallery/"
+.equ s_og_gallery_len, . - s_og_gallery
+s_og_about:      .ascii "/about/"
+.equ s_og_about_len, . - s_og_about
+j_empty_arr:     .ascii "[]"
+j_empty_obj:     .ascii "{}"
 s_page_pre:      .ascii "/page/"
 .equ s_page_pre_len, . - s_page_pre
 s_slash:         .ascii "/"
@@ -645,6 +665,14 @@ bind_post_vars:
     lea rdi, [rip + k_summary];  mov esi, k_summary_len;  mov rdx, [r12 + POST_SUMMARY_PTR]; mov rcx, [r12 + POST_SUMMARY_LEN]; call ctx_set
     lea rdi, [rip + k_cover];    mov esi, k_cover_len;    mov rdx, [r12 + POST_COVER_PTR];   mov rcx, [r12 + POST_COVER_LEN];   call ctx_set
     lea rdi, [rip + k_category]; mov esi, k_category_len; mov rdx, [r12 + POST_CAT_PTR];     mov rcx, [r12 + POST_CAT_LEN];     call ctx_set
+    xor edx, edx
+    xor ecx, ecx
+    cmp qword ptr [r12 + POST_PINNED], 0
+    je .Lbpv_pin
+    lea rdx, [rip + s_one_lit]
+    mov ecx, 1
+.Lbpv_pin:
+    lea rdi, [rip + k_pinned];   mov esi, k_pinned_len;   call ctx_set
 
     mov rdi, [r12 + POST_READ_MIN]
     mov esi, 2
@@ -1707,6 +1735,123 @@ handle_search_index:
     call send_200_ct
     pop r12
     ret
+
+# render_simple_page(rdi=title_ptr, rsi=title_len, rdx=og_path_ptr, rcx=og_path_len, r8=tpl_ptr, r9=tpl_len)
+render_simple_page:
+    push r12
+    push r13
+    push r14
+    push r15
+    push rbx
+    sub rsp, 16
+    mov [rsp + 0], r8
+    mov [rsp + 8], r9
+    mov r12, rdi
+    mov r13, rsi
+    mov r14, rdx
+    mov r15, rcx
+
+    call ctx_reset
+    lea rdi, [rip + k_page_title]; mov esi, k_page_title_len; mov rdx, r12; mov rcx, r13; call ctx_set
+    lea rdi, [rip + k_og_title];   mov esi, k_og_title_len;   mov rdx, r12; mov rcx, r13; call ctx_set
+    lea rdi, [rip + render_og_url]; mov rdx, r14; mov rcx, r15; call build_abs_url
+    push rax; push rdx
+    lea rdi, [rip + k_og_url]; mov esi, k_og_url_len
+    pop rcx; pop rdx
+    call ctx_set
+
+    mov rdi, [rsp + 0]
+    mov rsi, [rsp + 8]
+    call render_with_layout
+
+    add rsp, 16
+    pop rbx
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    ret
+
+.globl handle_gallery
+handle_gallery:
+    push r12
+    mov r12, rdi
+    lea rdi, [rip + s_gallery_title]; mov esi, s_gallery_title_len
+    lea rdx, [rip + s_og_gallery];    mov ecx, s_og_gallery_len
+    lea r8,  [rip + tpl_gallery];     mov r9d, tpl_gallery_len
+    call render_simple_page
+    mov rdi, r12
+    mov rsi, rax
+    call send_html_200
+    pop r12
+    ret
+
+.globl handle_about
+handle_about:
+    push r12
+    mov r12, rdi
+    lea rdi, [rip + s_about_title]; mov esi, s_about_title_len
+    lea rdx, [rip + s_og_about];    mov ecx, s_og_about_len
+    lea r8,  [rip + tpl_about];     mov r9d, tpl_about_len
+    call render_simple_page
+    mov rdi, r12
+    mov rsi, rax
+    call send_html_200
+    pop r12
+    ret
+
+# serve_content_json(rdi=conn, rsi=path_cstr, rdx=def_ptr, rcx=def_len)
+serve_content_json:
+    push r12
+    push r13
+    push r14
+    mov r12, rdi
+    mov r13, rdx
+    mov r14, rcx
+    mov rdi, rsi
+    lea rsi, [rip + g_render_page]
+    mov edx, 262143
+    call read_file_buf
+    test rax, rax
+    jle .Lscj_def
+    mov rdi, r12
+    lea rsi, [rip + g_render_page]
+    mov rdx, rax
+    lea rcx, [rip + ct_json]
+    call send_200_ct
+    jmp .Lscj_ret
+.Lscj_def:
+    mov rdi, r12
+    mov rsi, r13
+    mov rdx, r14
+    lea rcx, [rip + ct_json]
+    call send_200_ct
+.Lscj_ret:
+    pop r14
+    pop r13
+    pop r12
+    ret
+
+.globl handle_gallery_json
+handle_gallery_json:
+    lea rsi, [rip + p_gallery_json]
+    lea rdx, [rip + j_empty_arr]
+    mov ecx, 2
+    jmp serve_content_json
+
+.globl handle_about_json
+handle_about_json:
+    lea rsi, [rip + p_about_json]
+    lea rdx, [rip + j_empty_obj]
+    mov ecx, 2
+    jmp serve_content_json
+
+.globl handle_bgm_json
+handle_bgm_json:
+    lea rsi, [rip + p_bgm_json]
+    lea rdx, [rip + j_empty_arr]
+    mov ecx, 2
+    jmp serve_content_json
 
 .globl handle_rss
 handle_rss:

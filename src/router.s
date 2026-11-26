@@ -20,6 +20,16 @@ pat_category:      .ascii "/category/:name"
 .equ pat_category_len, . - pat_category
 pat_search:        .ascii "/search"
 .equ pat_search_len, . - pat_search
+pat_gallery:       .ascii "/gallery"
+.equ pat_gallery_len, . - pat_gallery
+pat_about:         .ascii "/about"
+.equ pat_about_len, . - pat_about
+pat_gallery_json:  .ascii "/gallery.json"
+.equ pat_gallery_json_len, . - pat_gallery_json
+pat_about_json:    .ascii "/about.json"
+.equ pat_about_json_len, . - pat_about_json
+pat_bgm_json:      .ascii "/bgm.json"
+.equ pat_bgm_json_len, . - pat_bgm_json
 pat_search_idx:    .ascii "/search-index.json"
 .equ pat_search_idx_len, . - pat_search_idx
 pat_rss:           .ascii "/rss.xml"
@@ -52,8 +62,20 @@ pat_st_upload:     .ascii "/api/studio/upload"
 .equ pat_st_upload_len, . - pat_st_upload
 pat_st_up_vid:     .ascii "/api/studio/upload-video"
 .equ pat_st_up_vid_len, . - pat_st_up_vid
+pat_st_up_aud:     .ascii "/api/studio/upload-audio"
+.equ pat_st_up_aud_len, . - pat_st_up_aud
 pat_st_settings:   .ascii "/api/studio/settings"
 .equ pat_st_settings_len, . - pat_st_settings
+pat_st_gallery:    .ascii "/api/studio/gallery"
+.equ pat_st_gallery_len, . - pat_st_gallery
+pat_st_about:      .ascii "/api/studio/about"
+.equ pat_st_about_len, . - pat_st_about
+pat_st_bgm:        .ascii "/api/studio/bgm"
+.equ pat_st_bgm_len, . - pat_st_bgm
+pat_st_media:      .ascii "/api/studio/media"
+.equ pat_st_media_len, . - pat_st_media
+pat_st_media_del:  .ascii "/api/studio/media/delete"
+.equ pat_st_media_del_len, . - pat_st_media_del
 
 .align 8
 route_table:
@@ -65,6 +87,11 @@ route_table:
     .quad METH_GET,    pat_tag,         pat_tag_len,         handle_tag,                0
     .quad METH_GET,    pat_category,    pat_category_len,    handle_category,           0
     .quad METH_GET,    pat_search,      pat_search_len,      handle_search,             0
+    .quad METH_GET,    pat_gallery,     pat_gallery_len,     handle_gallery,            0
+    .quad METH_GET,    pat_about,       pat_about_len,       handle_about,              0
+    .quad METH_GET,    pat_gallery_json, pat_gallery_json_len, handle_gallery_json,     0
+    .quad METH_GET,    pat_about_json,  pat_about_json_len,  handle_about_json,         0
+    .quad METH_GET,    pat_bgm_json,    pat_bgm_json_len,    handle_bgm_json,           0
     .quad METH_GET,    pat_search_idx,  pat_search_idx_len,  handle_search_index,       0
     .quad METH_GET,    pat_rss,         pat_rss_len,         handle_rss,                0
     .quad METH_GET,    pat_sitemap,     pat_sitemap_len,     handle_sitemap,            0
@@ -83,8 +110,14 @@ route_table:
     .quad METH_POST,   pat_st_cats_del, pat_st_cats_del_len, handle_studio_cat_del,     0
     .quad METH_POST,   pat_st_upload,   pat_st_upload_len,   handle_studio_upload,       0
     .quad METH_POST,   pat_st_up_vid,   pat_st_up_vid_len,   handle_studio_upload_video, 0
+    .quad METH_POST,   pat_st_up_aud,   pat_st_up_aud_len,   handle_studio_upload_video, 0
     .quad METH_GET,    pat_st_settings, pat_st_settings_len, handle_studio_settings_get, 0
     .quad METH_POST,   pat_st_settings, pat_st_settings_len, handle_studio_settings_save, 0
+    .quad METH_POST,   pat_st_gallery,  pat_st_gallery_len,  handle_studio_gallery_save, 0
+    .quad METH_POST,   pat_st_about,    pat_st_about_len,    handle_studio_about_save,   0
+    .quad METH_POST,   pat_st_bgm,      pat_st_bgm_len,      handle_studio_bgm_save,     0
+    .quad METH_GET,    pat_st_media,    pat_st_media_len,    handle_studio_media_list,   0
+    .quad METH_POST,   pat_st_media_del, pat_st_media_del_len, handle_studio_media_del,  0
     .quad 0, 0, 0, 0, 0
 
 msg_405: .asciz "405 Method Not Allowed"

@@ -1,0 +1,30 @@
+<div class="feed-wrap">
+  <section class="about-hero-card reveal">
+    <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+    <div class="about-head">
+      <div class="avatar-ring about-avatar-ring">
+        <img class="avatar-img about-avatar-img" src="{{ avatar_url }}" width="1024" height="1024" alt="{{ author }}" decoding="async">
+      </div>
+      <div class="about-head-info">
+        <span class="candy-badge candy-sky">✦ ABOUT ME</span>
+        <h1 class="about-name">{{ author }}</h1>
+        <p class="about-sub">{{ site_subtitle }}</p>
+      </div>
+    </div>
+    <div id="about-bio" class="about-bio prose">
+      <p>欢迎来到 {{ site_name }}！这里收集了日常随笔、二次元美图与生活小记，希望每一阵晴空微风都能带来好心情～</p>
+    </div>
+    <div id="about-tags" class="tag-row about-tags"></div>
+    <div id="about-socials" class="about-socials"></div>
+  </section>
+
+  <section id="friends-section" class="friends-card reveal">
+    <div class="friends-head">
+      <h2>✦ 友链星海</h2>
+      <span class="candy-badge candy-pink" id="friends-count">Friends</span>
+    </div>
+    <div id="friends-grid" class="friends-grid">
+      <div class="empty-state">正在加载友链…</div>
+    </div>
+  </section>
+</div>

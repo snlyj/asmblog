@@ -4,6 +4,7 @@
     <header class="article-header">
       <div class="article-crumb">
         <a href="/">&larr; 返回晴空首页</a>
+        {{#pinned}}<span class="pin-badge">📌 置顶</span>{{/pinned}}
         {{#category}}<a class="cat-badge" href="/category/{{ category }}/">✦ {{ category }}</a>{{/category}}
         <div class="font-size-ctrl" role="group" aria-label="正文字号调节">
           <button type="button" class="font-btn" data-font-size="sm" title="紧凑字号">A-</button>

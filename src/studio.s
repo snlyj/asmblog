@@ -12,6 +12,8 @@
 .align 8
 st_resp_buf:    .skip 262144
 st_file_buf:    .skip 262144
+st_ref_buf:     .skip 262144
+st_media_dents: .skip 16384
 st_hdr_buf:     .skip 512
 st_path_buf:    .skip 512
 st_tmp_buf:     .skip 512
@@ -96,6 +98,8 @@ jk_cover:       .ascii "cover"
 .equ jk_cover_len, . - jk_cover
 jk_draft:       .ascii "draft"
 .equ jk_draft_len, . - jk_draft
+jk_pinned:      .ascii "pinned"
+.equ jk_pinned_len, . - jk_pinned
 jk_content:     .ascii "content"
 .equ jk_content_len, . - jk_content
 jk_name:        .ascii "name"
@@ -183,12 +187,18 @@ j_err_imgsize:  .ascii "{\"error\":\"图片大小无效（最大约 3.8MB）\"}"
 .equ j_err_imgsize_len, . - j_err_imgsize
 j_err_imgtype:  .ascii "{\"error\":\"仅支持 JPG / PNG / GIF / WebP 图片\"}"
 .equ j_err_imgtype_len, . - j_err_imgtype
-j_err_vidtype:  .ascii "{\"error\":\"仅支持 MP4 / WebM / MOV / OGG 视频\"}"
+j_err_vidtype:  .ascii "{\"error\":\"仅支持 MP4 / WebM / MOV / OGG 视频或 MP3 / M4A / FLAC / WAV 音频\"}"
 .equ j_err_vidtype_len, . - j_err_vidtype
-j_err_vidsize:  .ascii "{\"error\":\"视频大小超过 100MB 限制或分片无效\"}"
+j_err_vidsize:  .ascii "{\"error\":\"文件大小超过 100MB 限制或分片无效\"}"
 .equ j_err_vidsize_len, . - j_err_vidsize
-j_err_vidid:    .ascii "{\"error\":\"无效的视频上传会话，请重试\"}"
+j_err_vidid:    .ascii "{\"error\":\"无效的分片上传会话，请重试\"}"
 .equ j_err_vidid_len, . - j_err_vidid
+j_err_json:     .ascii "{\"error\":\"无效的 JSON 数据\"}"
+.equ j_err_json_len, . - j_err_json
+j_err_media:    .ascii "{\"error\":\"文件名不合法或受保护，无法删除\"}"
+.equ j_err_media_len, . - j_err_media
+j_err_med404:   .ascii "{\"error\":\"该媒体文件不存在\"}"
+.equ j_err_med404_len, . - j_err_med404
 st_msg_404:     .asciz "404 Not Found"
 
 # JSON serialization fragments
@@ -208,12 +218,28 @@ jp_7:           .ascii "\",\"summary\":\""
 .equ jp_7_len, . - jp_7
 jp_8:           .ascii "\",\"draft\":"
 .equ jp_8_len, . - jp_8
+jp_8_pin:       .ascii ",\"pinned\":"
+.equ jp_8_pin_len, . - jp_8_pin
 jp_true:        .ascii "true"
 .equ jp_true_len, . - jp_true
 jp_false:       .ascii "false"
 .equ jp_false_len, . - jp_false
 jp_9_content:   .ascii ",\"content\":\""
 .equ jp_9_content_len, . - jp_9_content
+
+jm_1:           .ascii "{\"name\":\""
+.equ jm_1_len, . - jm_1
+jm_2:           .ascii "\",\"url\":\"/uploads/"
+.equ jm_2_len, . - jm_2
+jm_3:           .ascii "\",\"size\":"
+.equ jm_3_len, . - jm_3
+jm_4:           .ascii ",\"mtime\":"
+.equ jm_4_len, . - jm_4
+jm_5:           .ascii ",\"used\":"
+.equ jm_5_len, . - jm_5
+jm_6:           .ascii ",\"part\":"
+.equ jm_6_len, . - jm_6
+s_gitkeep:      .ascii ".gitkeep"
 
 jc_1:           .ascii "{\"name\":\""
 .equ jc_1_len, . - jc_1
@@ -300,9 +326,11 @@ fm_s_cover:     .ascii "\ncover: \""
 .equ fm_s_cover_len, . - fm_s_cover
 fm_s_sum:       .ascii "\nsummary: \""
 .equ fm_s_sum_len, . - fm_s_sum
-fm_s_draft_t:   .ascii "\"\ndraft: true\n---\n\n"
+fm_s_pin_line:  .ascii "\npinned: true"
+.equ fm_s_pin_line_len, . - fm_s_pin_line
+fm_s_draft_t:   .ascii "\ndraft: true\n---\n\n"
 .equ fm_s_draft_t_len, . - fm_s_draft_t
-fm_s_draft_f:   .ascii "\"\ndraft: false\n---\n\n"
+fm_s_draft_f:   .ascii "\ndraft: false\n---\n\n"
 .equ fm_s_draft_f_len, . - fm_s_draft_f
 
 # Filesystem paths
@@ -311,6 +339,12 @@ st_d_posts:     .asciz "content/posts"
 st_d_uploads:   .asciz "content/uploads"
 st_f_cats:      .asciz "content/categories.txt"
 st_f_cats_tmp:  .asciz "content/.categories.txt.tmp"
+st_f_gal:       .asciz "content/gallery.json"
+st_f_gal_tmp:   .asciz "content/.gallery.json.tmp"
+st_f_abt:       .asciz "content/about.json"
+st_f_abt_tmp:   .asciz "content/.about.json.tmp"
+st_f_bgm:       .asciz "content/bgm.json"
+st_f_bgm_tmp:   .asciz "content/.bgm.json.tmp"
 st_p_posts_pre: .ascii "content/posts/"
 .equ st_p_posts_pre_len, . - st_p_posts_pre
 st_p_posts_dot: .ascii "content/posts/."
@@ -338,6 +372,10 @@ ext_mp4_s:      .ascii ".mp4"
 ext_webm_s:     .ascii ".webm"
 ext_mov_s:      .ascii ".mov"
 ext_ogg_s:      .ascii ".ogg"
+ext_mp3_s:      .ascii ".mp3"
+ext_m4a_s:      .ascii ".m4a"
+ext_flac_s:     .ascii ".flac"
+ext_wav_s:      .ascii ".wav"
 
 .section .text
 
@@ -710,8 +748,16 @@ append_post_json:
     cmp qword ptr [r13 + POST_DRAFT], 0
     je .Lapj_df
     mov rdi, r12; lea rsi, [rip + jp_true]; mov edx, jp_true_len; call sb_mem
-    jmp .Lapj_cnt
+    jmp .Lapj_pin
 .Lapj_df:
+    mov rdi, r12; lea rsi, [rip + jp_false]; mov edx, jp_false_len; call sb_mem
+.Lapj_pin:
+    mov rdi, r12; lea rsi, [rip + jp_8_pin]; mov edx, jp_8_pin_len; call sb_mem
+    cmp qword ptr [r13 + POST_PINNED], 0
+    je .Lapj_pf
+    mov rdi, r12; lea rsi, [rip + jp_true]; mov edx, jp_true_len; call sb_mem
+    jmp .Lapj_cnt
+.Lapj_pf:
     mov rdi, r12; lea rsi, [rip + jp_false]; mov edx, jp_false_len; call sb_mem
 .Lapj_cnt:
     test r14, r14
@@ -770,7 +816,12 @@ studio_write_post_struct:
 .Lswps_sum:
     mov rdi, rsp; lea rsi, [rip + fm_s_sum]; mov edx, fm_s_sum_len; call sb_mem
     mov rdi, rsp; mov rsi, [r12 + POST_SUMMARY_PTR]; mov rdx, [r12 + POST_SUMMARY_LEN]; call sb_fm_safe
+    mov rdi, rsp; mov esi, '"'; call sb_byte
 
+    cmp qword ptr [r12 + POST_PINNED], 0
+    je .Lswps_chk_draft
+    mov rdi, rsp; lea rsi, [rip + fm_s_pin_line]; mov edx, fm_s_pin_line_len; call sb_mem
+.Lswps_chk_draft:
     cmp qword ptr [r12 + POST_DRAFT], 0
     je .Lswps_df
     mov rdi, rsp; lea rsi, [rip + fm_s_draft_t]; mov edx, fm_s_draft_t_len; call sb_mem
@@ -1213,7 +1264,7 @@ handle_studio_post_save:
     mov rdi, r14; mov rsi, r15; lea rdx, [rip + jk_draft]; mov ecx, jk_draft_len; mov r8, rsp; call json_get_str
     lea rdi, [rip + st_f_draft]; mov rsi, [rsp + SB_LEN]; call trim_ws
     test rdx, rdx
-    jz .Lhsps_content
+    jz .Lhsps_pinned
     push rax; push rdx
     mov rdi, rax; mov rsi, rdx; lea rdx, [rip + jv_true]; mov ecx, jv_true_len; call xslice_eq_ci
     pop rdx; pop rdi
@@ -1221,9 +1272,28 @@ handle_studio_post_save:
     jnz .Lhsps_is_draft
     mov rsi, rdx; lea rdx, [rip + jv_one]; mov ecx, jv_one_len; call xslice_eq
     test eax, eax
-    jz .Lhsps_content
+    jz .Lhsps_pinned
 .Lhsps_is_draft:
     mov qword ptr [rsp + 136], 1
+
+.Lhsps_pinned:
+    # 8b) pinned ("true" or "1") -> [rsp+160]
+    mov qword ptr [rsp + 160], 0
+    mov rdi, rsp; lea rsi, [rip + st_f_draft]; mov edx, 31; call sb_init
+    mov rdi, r14; mov rsi, r15; lea rdx, [rip + jk_pinned]; mov ecx, jk_pinned_len; mov r8, rsp; call json_get_str
+    lea rdi, [rip + st_f_draft]; mov rsi, [rsp + SB_LEN]; call trim_ws
+    test rdx, rdx
+    jz .Lhsps_content
+    push rax; push rdx
+    mov rdi, rax; mov rsi, rdx; lea rdx, [rip + jv_true]; mov ecx, jv_true_len; call xslice_eq_ci
+    pop rdx; pop rdi
+    test eax, eax
+    jnz .Lhsps_is_pin
+    mov rsi, rdx; lea rdx, [rip + jv_one]; mov ecx, jv_one_len; call xslice_eq
+    test eax, eax
+    jz .Lhsps_content
+.Lhsps_is_pin:
+    mov qword ptr [rsp + 160], 1
 
 .Lhsps_content:
     # 9) content (markdown body)
@@ -1263,7 +1333,12 @@ handle_studio_post_save:
 .Lhsps_w_sum:
     mov rdi, rsp; lea rsi, [rip + fm_s_sum]; mov edx, fm_s_sum_len; call sb_mem
     mov rdi, rsp; mov rsi, [rsp + 104]; mov rdx, [rsp + 112]; call sb_fm_safe
+    mov rdi, rsp; mov esi, '"'; call sb_byte
 
+    cmp qword ptr [rsp + 160], 0
+    je .Lhsps_w_chk_df
+    mov rdi, rsp; lea rsi, [rip + fm_s_pin_line]; mov edx, fm_s_pin_line_len; call sb_mem
+.Lhsps_w_chk_df:
     cmp qword ptr [rsp + 136], 0
     je .Lhsps_w_df
     mov rdi, rsp; lea rsi, [rip + fm_s_draft_t]; mov edx, fm_s_draft_t_len; call sb_mem
@@ -1921,7 +1996,15 @@ is_safe_vid_id:
     test eax, eax; jnz .Lsvi_yes
     lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + ext_ogg_s]; mov ecx, 4; call xslice_eq
     test eax, eax; jnz .Lsvi_yes
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + ext_mp3_s]; mov ecx, 4; call xslice_eq
+    test eax, eax; jnz .Lsvi_yes
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + ext_m4a_s]; mov ecx, 4; call xslice_eq
+    test eax, eax; jnz .Lsvi_yes
+    lea rdi, [r12 + r13 - 4]; mov esi, 4; lea rdx, [rip + ext_wav_s]; mov ecx, 4; call xslice_eq
+    test eax, eax; jnz .Lsvi_yes
     lea rdi, [r12 + r13 - 5]; mov esi, 5; lea rdx, [rip + ext_webm_s]; mov ecx, 5; call xslice_eq
+    test eax, eax; jnz .Lsvi_yes
+    lea rdi, [r12 + r13 - 5]; mov esi, 5; lea rdx, [rip + ext_flac_s]; mov ecx, 5; call xslice_eq
     test eax, eax; jnz .Lsvi_yes
 .Lsvi_no:
     xor eax, eax
@@ -1984,18 +2067,23 @@ handle_studio_upload_video:
     test rbx, rbx
     jnz .Lhsuv_append
 
-    # --- Chunk 0: verify video magic bytes ---
+    # --- Chunk 0: verify video or audio magic bytes ---
     cmp r15, 12
     jb .Lhsuv_badtype
-    # MP4 / MOV: bytes[4..7] == "ftyp" (0x70797466)
+    # MP4 / MOV / M4A: bytes[4..7] == "ftyp" (0x70797466)
     cmp dword ptr [r14 + 4], 0x70797466
     jne .Lhsuv_chk_webm
     cmp dword ptr [r14 + 8], 0x20207471       # "qt  " -> QuickTime .mov
     je .Lhsuv_is_mov
+    cmp dword ptr [r14 + 8], 0x2041344d       # "M4A " -> .m4a audio
+    je .Lhsuv_is_m4a
     lea rax, [rip + ext_mp4_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 4
     jmp .Lhsuv_newfile
 .Lhsuv_is_mov:
     lea rax, [rip + ext_mov_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 4
+    jmp .Lhsuv_newfile
+.Lhsuv_is_m4a:
+    lea rax, [rip + ext_m4a_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 4
     jmp .Lhsuv_newfile
 
 .Lhsuv_chk_webm:
@@ -2006,10 +2094,49 @@ handle_studio_upload_video:
     jmp .Lhsuv_newfile
 
 .Lhsuv_chk_ogg:
-    # OGG / OGV header: "OggS"
+    # OGG / OGV / OGA header: "OggS"
     cmp dword ptr [r14 + 0], 0x5367674f
-    jne .Lhsuv_badtype
+    jne .Lhsuv_chk_mp3
     lea rax, [rip + ext_ogg_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 4
+    jmp .Lhsuv_newfile
+
+.Lhsuv_chk_mp3:
+    # MP3 ID3v2 header "ID3" or raw MPEG audio frame sync (0xFF + top 3 bits set + layer != 0)
+    cmp byte ptr [r14 + 0], 'I'
+    jne .Lhsuv_chk_mp3sync
+    cmp byte ptr [r14 + 1], 'D'
+    jne .Lhsuv_chk_flac
+    cmp byte ptr [r14 + 2], '3'
+    jne .Lhsuv_chk_flac
+    jmp .Lhsuv_is_mp3
+.Lhsuv_chk_mp3sync:
+    cmp byte ptr [r14 + 0], 0xff
+    jne .Lhsuv_chk_flac
+    movzx eax, byte ptr [r14 + 1]
+    mov ecx, eax
+    and ecx, 0xe0
+    cmp ecx, 0xe0
+    jne .Lhsuv_chk_flac
+    and eax, 0x06
+    jz .Lhsuv_chk_flac
+.Lhsuv_is_mp3:
+    lea rax, [rip + ext_mp3_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 4
+    jmp .Lhsuv_newfile
+
+.Lhsuv_chk_flac:
+    # FLAC header: "fLaC"
+    cmp dword ptr [r14 + 0], 0x43614c66
+    jne .Lhsuv_chk_wav
+    lea rax, [rip + ext_flac_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 5
+    jmp .Lhsuv_newfile
+
+.Lhsuv_chk_wav:
+    # WAV header: "RIFF" ... "WAVE"
+    cmp dword ptr [r14 + 0], 0x46464952
+    jne .Lhsuv_badtype
+    cmp dword ptr [r14 + 8], 0x45564157
+    jne .Lhsuv_badtype
+    lea rax, [rip + ext_wav_s]; mov [rsp + 24], rax; mov qword ptr [rsp + 32], 4
 
 .Lhsuv_newfile:
     lea rdi, [rip + st_d_content]; mov esi, 0755; call sys_mkdir
@@ -2558,4 +2685,482 @@ handle_studio_settings_save:
     pop r12
     pop rbx
     pop rbp
+    ret
+
+# =========================================================================
+# 14. POST /api/studio/{gallery,about,bgm} (atomic JSON config/collection save)
+# =========================================================================
+# studio_save_json_file(rdi=conn, rsi=&req, rdx=final_path, rcx=tmp_path, r8d=expect_ch)
+studio_save_json_file:
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 32           # 5 pushes + ret = 48, +32 = 80 (16B aligned)
+    mov r12, rdi
+    mov r13, rsi
+    mov r14, rdx
+    mov r15, rcx
+    mov ebx, r8d
+
+    mov rdi, r13
+    call studio_is_authed
+    test eax, eax
+    jnz .Lssjf_body
+    mov rdi, r12; lea rsi, [rip + st_401]; lea rdx, [rip + j_err_unauth]; mov ecx, j_err_unauth_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lssjf_ret
+
+.Lssjf_body:
+    mov rdi, [r13 + REQ_BODY_PTR]
+    mov rsi, [r13 + REQ_BODY_LEN]
+    call trim_ws
+    # rax = ptr, rdx = len
+    cmp rdx, 2
+    jb .Lssjf_bad
+    cmp rdx, 262000
+    ja .Lssjf_bad
+    cmp byte ptr [rax], bl
+    jne .Lssjf_bad
+
+    mov [rsp + 0], rax
+    mov [rsp + 8], rdx
+    lea rdi, [rip + st_d_content]; mov esi, 0755; call sys_mkdir
+    mov rdi, r14
+    mov rsi, r15
+    mov rdx, [rsp + 0]
+    mov rcx, [rsp + 8]
+    call write_file_atomic
+    test rax, rax
+    jns .Lssjf_ok
+    mov rdi, r12; lea rsi, [rip + st_500]; lea rdx, [rip + j_err_write]; mov ecx, j_err_write_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lssjf_ret
+
+.Lssjf_bad:
+    mov rdi, r12; lea rsi, [rip + st_400]; lea rdx, [rip + j_err_json]; mov ecx, j_err_json_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lssjf_ret
+
+.Lssjf_ok:
+    mov rdi, r12; lea rsi, [rip + st_200]; lea rdx, [rip + j_ok]; mov ecx, j_ok_len; xor r8d, r8d
+    call studio_send_json
+
+.Lssjf_ret:
+    add rsp, 32
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
+.globl handle_studio_gallery_save
+handle_studio_gallery_save:
+    lea rdx, [rip + st_f_gal]
+    lea rcx, [rip + st_f_gal_tmp]
+    mov r8d, '['
+    jmp studio_save_json_file
+
+.globl handle_studio_about_save
+handle_studio_about_save:
+    lea rdx, [rip + st_f_abt]
+    lea rcx, [rip + st_f_abt_tmp]
+    mov r8d, '{'
+    jmp studio_save_json_file
+
+.globl handle_studio_bgm_save
+handle_studio_bgm_save:
+    lea rdx, [rip + st_f_bgm]
+    lea rcx, [rip + st_f_bgm_tmp]
+    mov r8d, '['
+    jmp studio_save_json_file
+
+# =========================================================================
+# 15. GET /api/studio/media & POST /api/studio/media/delete
+#     Scans content/uploads/, cross-references posts + config + gallery/about/bgm!
+# =========================================================================
+
+# load_media_refs() -> concatenates gallery/about/bgm JSON + avatar/banner into st_ref_buf; returns rax=len
+load_media_refs:
+    push rbx
+    sub rsp, 32           # [rsp+0..23]=sbuf (1 push + ret = 16, +32 = 48 aligned)
+    mov rdi, rsp; lea rsi, [rip + st_ref_buf]; mov edx, 262143; call sb_init
+
+    lea rdi, [rip + st_f_gal]; lea rsi, [rip + st_file_buf]; mov edx, 262143; call read_file_buf
+    test rax, rax; jle .Llmr_abt
+    mov rdi, rsp; lea rsi, [rip + st_file_buf]; mov rdx, rax; call sb_mem
+    mov rdi, rsp; mov esi, 10; call sb_byte
+.Llmr_abt:
+    lea rdi, [rip + st_f_abt]; lea rsi, [rip + st_file_buf]; mov edx, 262143; call read_file_buf
+    test rax, rax; jle .Llmr_bgm
+    mov rdi, rsp; lea rsi, [rip + st_file_buf]; mov rdx, rax; call sb_mem
+    mov rdi, rsp; mov esi, 10; call sb_byte
+.Llmr_bgm:
+    lea rdi, [rip + st_f_bgm]; lea rsi, [rip + st_file_buf]; mov edx, 262143; call read_file_buf
+    test rax, rax; jle .Llmr_cfg
+    mov rdi, rsp; lea rsi, [rip + st_file_buf]; mov rdx, rax; call sb_mem
+    mov rdi, rsp; mov esi, 10; call sb_byte
+.Llmr_cfg:
+    mov rdi, rsp; lea rsi, [rip + g_cfg_avatar]; mov rdx, [rip + g_cfg_avatar_len]; call sb_mem
+    mov rdi, rsp; mov esi, 10; call sb_byte
+    mov rdi, rsp; lea rsi, [rip + g_cfg_banner]; mov rdx, [rip + g_cfg_banner_len]; call sb_mem
+    mov rax, [rsp + SB_LEN]
+    add rsp, 32
+    pop rbx
+    ret
+
+# is_media_used(rdi=name_ptr, rsi=name_len, rdx=refs_len) -> eax=1 if referenced anywhere, 0 otherwise
+is_media_used:
+    push rbx
+    push r12
+    push r13
+    push r14
+    mov r12, rdi
+    mov r13, rsi
+    mov r14, rdx
+
+    # 1) Check concatenated JSON/config references
+    test r14, r14
+    jz .Limu_posts
+    lea rdi, [rip + st_ref_buf]
+    mov rsi, r14
+    mov rdx, r12
+    mov rcx, r13
+    call xmemmem_ci
+    test eax, eax
+    jnz .Limu_yes
+
+.Limu_posts:
+    # 2) Check every post's cover & markdown content (includes drafts!)
+    xor ebx, ebx
+.Limu_loop:
+    cmp rbx, [rip + g_post_count]
+    jae .Limu_no
+    lea r8, [rip + g_post_ptrs]
+    mov r9, [r8 + rbx*8]
+    cmp qword ptr [r9 + POST_COVER_LEN], 0
+    je .Limu_md
+    push r9
+    mov rdi, [r9 + POST_COVER_PTR]
+    mov rsi, [r9 + POST_COVER_LEN]
+    mov rdx, r12
+    mov rcx, r13
+    call xmemmem_ci
+    pop r9
+    test eax, eax
+    jnz .Limu_yes
+.Limu_md:
+    cmp qword ptr [r9 + POST_MD_LEN], 0
+    je .Limu_next
+    mov rdi, [r9 + POST_MD_PTR]
+    mov rsi, [r9 + POST_MD_LEN]
+    mov rdx, r12
+    mov rcx, r13
+    call xmemmem_ci
+    test eax, eax
+    jnz .Limu_yes
+.Limu_next:
+    inc rbx
+    jmp .Limu_loop
+
+.Limu_yes:
+    mov eax, 1
+    jmp .Limu_ret
+.Limu_no:
+    xor eax, eax
+.Limu_ret:
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
+.globl handle_studio_media_list
+handle_studio_media_list:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    # 6 pushes + ret = 56; +264 = 320 (16B aligned)
+    # [0..23]=resp_sb, [24..47]=path_sb, [48..191]=stat(144), [192]=dir_fd,
+    # [200]=refs_len, [208]=out_cnt, [216]=dents_bytes, [224]=dents_off,
+    # [232]=name_ptr, [240]=name_len, [248]=is_part
+    sub rsp, 264
+    mov r12, rdi
+    mov r13, rsi
+
+    mov rdi, r13
+    call studio_is_authed
+    test eax, eax
+    jnz .Lhsml_ok
+    mov rdi, r12; lea rsi, [rip + st_401]; lea rdx, [rip + j_err_unauth]; mov ecx, j_err_unauth_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsml_ret
+
+.Lhsml_ok:
+    call load_media_refs
+    mov [rsp + 200], rax
+    mov qword ptr [rsp + 208], 0
+
+    lea rdi, [rsp + 0]; lea rsi, [rip + st_resp_buf]; mov edx, 262143; call sb_init
+    lea rdi, [rsp + 0]; mov esi, '['; call sb_byte
+
+    mov rdi, AT_FDCWD
+    lea rsi, [rip + st_d_uploads]
+    mov edx, O_RDONLY | O_DIRECTORY | O_CLOEXEC
+    xor ecx, ecx
+    call sys_openat
+    test rax, rax
+    js .Lhsml_send
+    mov [rsp + 192], rax
+
+.Lhsml_dents:
+    mov rdi, [rsp + 192]
+    lea rsi, [rip + st_media_dents]
+    mov edx, 16384
+    call sys_getdents64
+    test rax, rax
+    jle .Lhsml_close
+    mov [rsp + 216], rax
+    mov qword ptr [rsp + 224], 0
+
+.Lhsml_entry:
+    mov rax, [rsp + 224]
+    cmp rax, [rsp + 216]
+    jae .Lhsml_dents
+    lea r14, [rip + st_media_dents]
+    add r14, rax
+    movzx ecx, word ptr [r14 + 16]
+    add [rsp + 224], rcx
+    lea r15, [r14 + 19]               # d_name
+    mov rdi, r15
+    call xstrlen
+    test rax, rax
+    jz .Lhsml_entry
+    mov [rsp + 232], r15
+    mov [rsp + 240], rax
+
+    # Skip ".", "..", and ".gitkeep"
+    cmp rax, 1
+    jne .Lhsml_chk_dot2
+    cmp byte ptr [r15], '.'
+    je .Lhsml_entry
+.Lhsml_chk_dot2:
+    cmp rax, 2
+    jne .Lhsml_chk_gk
+    cmp word ptr [r15], 0x2e2e
+    je .Lhsml_entry
+.Lhsml_chk_gk:
+    cmp rax, 8
+    jne .Lhsml_stat
+    mov rdi, r15; mov esi, 8; lea rdx, [rip + s_gitkeep]; mov ecx, 8; call xslice_eq
+    test eax, eax
+    jnz .Lhsml_entry
+
+.Lhsml_stat:
+    lea rdi, [rsp + 24]; lea rsi, [rip + st_path_buf]; mov edx, 511; call sb_init
+    lea rdi, [rsp + 24]; lea rsi, [rip + st_p_up_pre]; mov edx, st_p_up_pre_len; call sb_mem
+    lea rdi, [rsp + 24]; mov rsi, [rsp + 232]; mov rdx, [rsp + 240]; call sb_mem
+    lea rdi, [rsp + 24]; xor esi, esi; call sb_byte
+
+    lea rdi, [rip + st_path_buf]
+    lea rsi, [rsp + 48]
+    call sys_stat
+    test rax, rax
+    js .Lhsml_entry
+    mov eax, [rsp + 48 + STAT_MODE]
+    and eax, S_IFMT
+    cmp eax, S_IFREG
+    jne .Lhsml_entry
+
+    # part = (d_name[0] == '.')
+    xor ebx, ebx
+    mov r15, [rsp + 232]
+    cmp byte ptr [r15], '.'
+    sete bl
+    mov [rsp + 248], rbx
+
+    # used = !part && is_media_used(name, len, refs_len)
+    xor r14d, r14d
+    test rbx, rbx
+    jnz .Lhsml_emit
+    mov rdi, r15
+    mov rsi, [rsp + 240]
+    mov rdx, [rsp + 200]
+    call is_media_used
+    mov r14d, eax
+
+.Lhsml_emit:
+    cmp qword ptr [rsp + 208], 0
+    je .Lhsml_first
+    lea rdi, [rsp + 0]; mov esi, ','; call sb_byte
+.Lhsml_first:
+    inc qword ptr [rsp + 208]
+    lea rdi, [rsp + 0]; lea rsi, [rip + jm_1]; mov edx, jm_1_len; call sb_mem
+    lea rdi, [rsp + 0]; mov rsi, [rsp + 232]; mov rdx, [rsp + 240]; call sb_esc_json
+    lea rdi, [rsp + 0]; lea rsi, [rip + jm_2]; mov edx, jm_2_len; call sb_mem
+    lea rdi, [rsp + 0]; mov rsi, [rsp + 232]; mov rdx, [rsp + 240]; call sb_esc_json
+    lea rdi, [rsp + 0]; lea rsi, [rip + jm_3]; mov edx, jm_3_len; call sb_mem
+    lea rdi, [rsp + 0]; mov rsi, [rsp + 48 + STAT_SIZE]; call sb_uint
+    lea rdi, [rsp + 0]; lea rsi, [rip + jm_4]; mov edx, jm_4_len; call sb_mem
+    lea rdi, [rsp + 0]; mov rsi, [rsp + 48 + STAT_MTIME]; call sb_uint
+    lea rdi, [rsp + 0]; lea rsi, [rip + jm_5]; mov edx, jm_5_len; call sb_mem
+    test r14d, r14d
+    jz .Lhsml_uf
+    lea rdi, [rsp + 0]; lea rsi, [rip + jp_true]; mov edx, jp_true_len; call sb_mem
+    jmp .Lhsml_pt
+.Lhsml_uf:
+    lea rdi, [rsp + 0]; lea rsi, [rip + jp_false]; mov edx, jp_false_len; call sb_mem
+.Lhsml_pt:
+    lea rdi, [rsp + 0]; lea rsi, [rip + jm_6]; mov edx, jm_6_len; call sb_mem
+    cmp qword ptr [rsp + 248], 0
+    je .Lhsml_pf
+    lea rdi, [rsp + 0]; lea rsi, [rip + jp_true]; mov edx, jp_true_len; call sb_mem
+    jmp .Lhsml_endobj
+.Lhsml_pf:
+    lea rdi, [rsp + 0]; lea rsi, [rip + jp_false]; mov edx, jp_false_len; call sb_mem
+.Lhsml_endobj:
+    lea rdi, [rsp + 0]; mov esi, '}'; call sb_byte
+    jmp .Lhsml_entry
+
+.Lhsml_close:
+    mov rdi, [rsp + 192]
+    call sys_close
+
+.Lhsml_send:
+    lea rdi, [rsp + 0]; mov esi, ']'; call sb_byte
+    mov rdi, r12
+    lea rsi, [rip + st_200]
+    lea rdx, [rip + st_resp_buf]
+    mov rcx, [rsp + SB_LEN]
+    xor r8d, r8d
+    call studio_send_json
+
+.Lhsml_ret:
+    add rsp, 264
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+# validate_media_name(rdi=ptr, rsi=len) -> eax=1 if safe single upload/part filename, 0 otherwise
+validate_media_name:
+    push rbx
+    push r12
+    push r13
+    mov r12, rdi
+    mov r13, rsi
+    test r13, r13
+    jz .Lvmn_no
+    cmp r13, 120
+    ja .Lvmn_no
+    cmp r13, 1
+    jne .Lvmn_chk_gk
+    cmp byte ptr [r12], '.'
+    je .Lvmn_no
+.Lvmn_chk_gk:
+    cmp r13, 8
+    jne .Lvmn_scan
+    mov rdi, r12; mov esi, 8; lea rdx, [rip + s_gitkeep]; mov ecx, 8; call xslice_eq
+    test eax, eax
+    jnz .Lvmn_no
+.Lvmn_scan:
+    xor ebx, ebx
+.Lvmn_loop:
+    cmp rbx, r13
+    jae .Lvmn_yes
+    movzx eax, byte ptr [r12 + rbx]
+    cmp al, 32
+    jbe .Lvmn_no
+    cmp al, '/'
+    je .Lvmn_no
+    cmp al, '\\'
+    je .Lvmn_no
+    cmp al, '.'
+    jne .Lvmn_next
+    test rbx, rbx
+    jz .Lvmn_next
+    cmp byte ptr [r12 + rbx - 1], '.'
+    je .Lvmn_no
+.Lvmn_next:
+    inc rbx
+    jmp .Lvmn_loop
+.Lvmn_yes:
+    mov eax, 1
+    jmp .Lvmn_ret
+.Lvmn_no:
+    xor eax, eax
+.Lvmn_ret:
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
+.globl handle_studio_media_del
+handle_studio_media_del:
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 40           # 4 pushes + ret = 40, +40 = 80 (16B aligned)
+    mov r12, rdi
+    mov r13, rsi
+
+    mov rdi, r13
+    call studio_is_authed
+    test eax, eax
+    jnz .Lhsmd_parse
+    mov rdi, r12; lea rsi, [rip + st_401]; lea rdx, [rip + j_err_unauth]; mov ecx, j_err_unauth_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsmd_ret
+
+.Lhsmd_parse:
+    mov rdi, rsp; lea rsi, [rip + st_f_name]; mov edx, 255; call sb_init
+    mov rdi, [r13 + REQ_BODY_PTR]
+    mov rsi, [r13 + REQ_BODY_LEN]
+    lea rdx, [rip + jk_name]
+    mov ecx, jk_name_len
+    mov r8, rsp
+    call json_get_str
+    lea rdi, [rip + st_f_name]; mov rsi, [rsp + SB_LEN]; call trim_ws
+    mov r14, rax
+    mov r15, rdx
+    mov rdi, r14; mov rsi, r15; call validate_media_name
+    test eax, eax
+    jnz .Lhsmd_unlink
+    mov rdi, r12; lea rsi, [rip + st_400]; lea rdx, [rip + j_err_media]; mov ecx, j_err_media_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsmd_ret
+
+.Lhsmd_unlink:
+    mov rdi, rsp; lea rsi, [rip + st_path_buf]; mov edx, 511; call sb_init
+    mov rdi, rsp; lea rsi, [rip + st_p_up_pre]; mov edx, st_p_up_pre_len; call sb_mem
+    mov rdi, rsp; mov rsi, r14; mov rdx, r15; call sb_mem
+    mov rdi, rsp; xor esi, esi; call sb_byte
+    lea rdi, [rip + st_path_buf]
+    call sys_unlink
+    test rax, rax
+    jns .Lhsmd_ok
+    mov rdi, r12; lea rsi, [rip + st_404]; lea rdx, [rip + j_err_med404]; mov ecx, j_err_med404_len; xor r8d, r8d
+    call studio_send_json
+    jmp .Lhsmd_ret
+
+.Lhsmd_ok:
+    mov rdi, r12; lea rsi, [rip + st_200]; lea rdx, [rip + j_ok]; mov ecx, j_ok_len; xor r8d, r8d
+    call studio_send_json
+
+.Lhsmd_ret:
+    add rsp, 40
+    pop r15
+    pop r14
+    pop r13
+    pop r12
     ret

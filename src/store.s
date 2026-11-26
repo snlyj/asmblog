@@ -558,6 +558,11 @@ sort_posts_desc:
     cmp r15, 0
     jl .Lsp_place
     mov r8, [r13 + r15*8]
+    # Compare pinned(post[j]) vs pinned(key): pinned posts always float to top!
+    mov rax, [r8 + POST_PINNED]
+    cmp rax, [r14 + POST_PINNED]
+    ja .Lsp_place
+    jb .Lsp_shift
     # Compare date(post[j]) vs date(key): want date DESC (so shift if post[j].date < key.date)
     mov rdi, [r8 + POST_DATE_PTR]
     mov rsi, [r8 + POST_DATE_LEN]

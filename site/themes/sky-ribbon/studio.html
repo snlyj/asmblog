@@ -638,6 +638,135 @@
     }
     .cat-card-name { font-weight: 800; color: var(--fg); }
 
+    /* Curated Gallery, Media Library, About/Friends & BGM Admin Grids */
+    .gal-admin-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .gal-admin-card {
+      border-radius: 18px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-soft);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .gal-admin-thumb {
+      width: 100%;
+      height: 175px;
+      object-fit: cover;
+      display: block;
+      background: #0f182c;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .gal-admin-body {
+      padding: 10px 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      flex: 1;
+    }
+    .gal-admin-body .inp { padding: 7px 10px; font-size: 0.84rem; border-radius: 10px; }
+    .gal-admin-ops {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .media-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .media-card {
+      border-radius: 16px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-soft);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .media-thumb {
+      width: 100%;
+      height: 132px;
+      object-fit: cover;
+      display: block;
+      background: #0f182c;
+    }
+    .media-icon-box {
+      width: 100%;
+      height: 132px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: linear-gradient(135deg, var(--sky-soft), var(--pink-soft));
+      color: var(--sky-fg);
+      font-weight: 800;
+      font-size: 0.88rem;
+    }
+    .media-body {
+      padding: 9px 11px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+    .media-name {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--fg);
+      word-break: break-all;
+      line-height: 1.3;
+    }
+    .media-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+    .media-ops {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: auto;
+      padding-top: 4px;
+    }
+    .dyn-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+    .dyn-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 8px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-soft);
+    }
+    .dyn-row .inp { padding: 8px 11px; font-size: 0.86rem; }
+    .dyn-row-ops { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .bgm-audio-mini { width: 100%; height: 34px; margin-top: 4px; }
+    .sub-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 20px 0 6px;
+      padding-top: 16px;
+      border-top: 1.5px dashed var(--border);
+    }
+    .sub-head h3 { margin: 0; font-size: 1rem; color: var(--fg); }
+    .badge-ok { background: var(--ok-soft); color: var(--ok); }
+    .badge-muted { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+
     /* Toast */
     .toast {
       position: fixed;
@@ -703,9 +832,13 @@
     </div>
     <nav class="tabs" role="tablist">
       <button class="tab-btn is-active" data-tab="write" type="button">✍️ 写文章</button>
-      <button class="tab-btn" data-tab="posts" type="button">📚 文章管理 (<span id="cnt-posts">0</span>)</button>
-      <button class="tab-btn" data-tab="cats" type="button">🏷️ 分类管理 (<span id="cnt-cats">0</span>)</button>
-      <button class="tab-btn" data-tab="settings" type="button">⚙️ 站点设置</button>
+      <button class="tab-btn" data-tab="posts" type="button">📚 文章 (<span id="cnt-posts">0</span>)</button>
+      <button class="tab-btn" data-tab="gallery" type="button">🖼️ 画廊 (<span id="cnt-gallery">0</span>)</button>
+      <button class="tab-btn" data-tab="media" type="button">🗂️ 媒体库 (<span id="cnt-media">0</span>)</button>
+      <button class="tab-btn" data-tab="about" type="button">🎀 关于</button>
+      <button class="tab-btn" data-tab="bgm" type="button">🎵 歌单 (<span id="cnt-bgm">0</span>)</button>
+      <button class="tab-btn" data-tab="cats" type="button">🏷️ 分类 (<span id="cnt-cats">0</span>)</button>
+      <button class="tab-btn" data-tab="settings" type="button">⚙️ 设置</button>
     </nav>
     <div class="top-actions">
       <button id="studio-theme-btn" class="btn btn-sm" type="button" title="切换晴空 / 星河夜间模式">☾ 夜间</button>
@@ -817,10 +950,16 @@
     </div>
 
     <div class="editor-footer">
-      <label class="draft-chk">
-        <input id="f-draft" type="checkbox">
-        <span>存为草稿（暂不在前台公开显示）</span>
-      </label>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+        <label class="draft-chk">
+          <input id="f-draft" type="checkbox">
+          <span>存为草稿（暂不公开）</span>
+        </label>
+        <label class="draft-chk">
+          <input id="f-pinned" type="checkbox">
+          <span>📌 置顶文章（固定在首页最前面）</span>
+        </label>
+      </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <span class="field-hint">快捷键 Ctrl+S 保存</span>
         <button id="save-btn" class="btn btn-primary" type="button">✦ 发布文章</button>
@@ -848,7 +987,103 @@
     <div id="posts-list" class="item-list"></div>
   </section>
 
-  <!-- TAB 3: Categories Management -->
+  <!-- TAB 3: Curated Illustration Gallery (100% Author-Selected!) -->
+  <section id="tab-gallery" class="panel hidden">
+    <div class="panel-head">
+      <h2 class="panel-title">🖼️ 精选画廊管理 <span class="badge badge-pink">仅展示你亲手挑选的作品</span></h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn btn-sm" href="/gallery/" target="_blank">预览画廊 ↗</a>
+        <button id="save-gallery-btn" class="btn btn-primary btn-sm" type="button">✦ 保存画廊</button>
+      </div>
+    </div>
+    <div id="gal-drop" class="cover-box">
+      <div class="cover-ctrl">
+        <div class="cover-btns">
+          <button id="gal-upload-btn" class="btn btn-pink btn-sm" type="button">🖼️ 上传美图加入画廊（保留原比例原图）</button>
+          <button id="gal-pick-media-btn" class="btn btn-soft btn-sm" type="button">🗂️ 从媒体库挑选</button>
+          <span id="gal-status" class="field-hint"></span>
+        </div>
+        <span class="field-hint">支持多选或直接拖入高清美图：自动生成轻巧 WebP 预览并完整保留未经裁剪的高清原图，不会混入普通文章封面。</span>
+      </div>
+      <input id="gal-files" type="file" accept="image/*" multiple class="hidden">
+    </div>
+    <div id="gal-admin-list" class="gal-admin-grid"></div>
+  </section>
+
+  <!-- TAB 4: Media Library & Unused/Orphan Cleanup -->
+  <section id="tab-media" class="panel hidden">
+    <div class="panel-head">
+      <h2 class="panel-title">🗂️ 媒体素材库与清理 <span id="media-stats-badge" class="badge"></span></h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="media-clean-btn" class="btn btn-danger btn-sm" type="button">🧹 一键清理未使用与残留</button>
+        <button id="media-refresh-btn" class="btn btn-soft btn-sm" type="button">↻ 刷新扫描</button>
+      </div>
+    </div>
+    <div class="posts-filter-bar">
+      <input id="media-search" class="inp" type="search" placeholder="🔍 搜索文件名...">
+      <div class="filter-pills" role="group" aria-label="媒体筛选">
+        <button type="button" class="filter-pill is-active" data-media-filter="all">全部</button>
+        <button type="button" class="filter-pill" data-media-filter="img">图片</button>
+        <button type="button" class="filter-pill" data-media-filter="av">视频/音频</button>
+        <button type="button" class="filter-pill" data-media-filter="unused">未使用/残留</button>
+      </div>
+    </div>
+    <div id="media-grid" class="media-grid"></div>
+  </section>
+
+  <!-- TAB 5: About Me & Friends Wall -->
+  <section id="tab-about" class="panel hidden">
+    <div class="panel-head">
+      <h2 class="panel-title">🎀 关于我与友链卡片</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn btn-sm" href="/about/" target="_blank">预览关于页 ↗</a>
+        <button id="save-about-btn" class="btn btn-primary btn-sm" type="button">✦ 保存关于与友链</button>
+      </div>
+    </div>
+    <div class="meta-grid">
+      <div class="field field-full">
+        <label for="ab-bio">个人简介（换行自动分段）</label>
+        <textarea id="ab-bio" class="txt" rows="4" placeholder="写点关于自己的介绍、喜欢的番剧/角色、或者建站初心吧～"></textarea>
+      </div>
+      <div class="field field-full">
+        <label for="ab-tags">兴趣属性标签（多个用英文逗号分隔）</label>
+        <input id="ab-tags" class="inp" type="text" placeholder="例如：二次元, 插画收藏, 摄影, 折腾技术">
+      </div>
+    </div>
+    <div class="sub-head">
+      <h3>✦ 社交链接</h3>
+      <button id="ab-add-social" class="btn btn-soft btn-sm" type="button">+ 添加社交链接</button>
+    </div>
+    <div id="ab-socials-list" class="dyn-list"></div>
+
+    <div class="sub-head">
+      <h3>✦ 友链星海（Friends）</h3>
+      <button id="ab-add-friend" class="btn btn-pink btn-sm" type="button">+ 添加小伙伴友链</button>
+    </div>
+    <div id="ab-friends-list" class="dyn-list"></div>
+  </section>
+
+  <!-- TAB 6: BGM Playlist (PJAX Continuous Mini Player) -->
+  <section id="tab-bgm" class="panel hidden">
+    <div class="panel-head">
+      <h2 class="panel-title">🎵 星梦唱片机歌单 <span class="badge badge-lilac">换页不断流 · 默认不自动打扰</span></h2>
+      <button id="save-bgm-btn" class="btn btn-primary btn-sm" type="button">✦ 保存歌单</button>
+    </div>
+    <div class="cover-box">
+      <div class="cover-ctrl">
+        <div class="cover-btns">
+          <button id="bgm-upload-btn" class="btn btn-pink btn-sm" type="button">🎵 上传音乐文件 (MP3 / M4A / OGG / FLAC / WAV)</button>
+          <button id="bgm-add-row" class="btn btn-soft btn-sm" type="button">+ 手动填写外链</button>
+          <span id="bgm-status" class="field-hint"></span>
+        </div>
+        <span class="field-hint">歌单为空时前台自动隐藏左下角唱片机；加入曲目保存后，访客手动点击即可在全站切页时连续播放背景音乐～</span>
+      </div>
+      <input id="bgm-files" type="file" accept="audio/*,.mp3,.m4a,.ogg,.flac,.wav" multiple class="hidden">
+    </div>
+    <div id="bgm-admin-list" class="dyn-list"></div>
+  </section>
+
+  <!-- TAB 7: Categories Management -->
   <section id="tab-cats" class="panel hidden">
     <div class="panel-head">
       <h2 class="panel-title">🏷️ 帖子分类管理</h2>
@@ -1027,6 +1262,7 @@
   var fCover = document.getElementById('f-cover');
   var fContent = document.getElementById('f-content');
   var fDraft = document.getElementById('f-draft');
+  var fPinned = document.getElementById('f-pinned');
 
   var coverDrop = document.getElementById('cover-drop');
   var coverFile = document.getElementById('cover-file');
@@ -1066,6 +1302,9 @@
   var postsMatchCount = document.getElementById('posts-match-count');
   var catsGrid = document.getElementById('cats-grid');
   var cntPosts = document.getElementById('cnt-posts');
+  var cntGallery = document.getElementById('cnt-gallery');
+  var cntMedia = document.getElementById('cnt-media');
+  var cntBgm = document.getElementById('cnt-bgm');
   var cntCats = document.getElementById('cnt-cats');
   var toastEl = document.getElementById('toast');
   var studioThemeBtn = document.getElementById('studio-theme-btn');
@@ -1075,6 +1314,11 @@
   var state = {
     posts: [],
     cats: [],
+    gallery: [],
+    media: [],
+    mediaFilter: 'all',
+    about: { bio: '', tags: [], socials: [], friends: [] },
+    bgm: [],
     editingSlug: '',
     previewOn: false,
     toastTimer: null,
@@ -1177,6 +1421,7 @@
       summary: fSummary.value || '',
       cover: fCover.value || '',
       draft: !!fDraft.checked,
+      pinned: !!(fPinned && fPinned.checked),
       content: fContent.value || '',
       savedAt: Date.now()
     };
@@ -1225,6 +1470,7 @@
     fCover.value = d.cover || '';
     fContent.value = d.content || '';
     fDraft.checked = !!d.draft;
+    if (fPinned) fPinned.checked = !!d.pinned;
     editorModeLabel.textContent = state.editingSlug ? '✏️ 编辑文章' : '✍️ 发布新文章';
     if (state.editingSlug) {
       editorSlugBadge.textContent = state.editingSlug;
@@ -1248,7 +1494,7 @@
     showToast('已清除本地暂存草稿');
   });
 
-  [fTitle, fCat, fTags, fSlug, fDate, fSummary, fCover, fDraft, fContent].forEach(function (el) {
+  [fTitle, fCat, fTags, fSlug, fDate, fSummary, fCover, fDraft, fPinned, fContent].forEach(function (el) {
     if (!el) return;
     el.addEventListener('input', markDirty);
     el.addEventListener('change', markDirty);
@@ -1315,15 +1561,17 @@
   }
 
   /* Tabs */
+  var ALL_TABS = ['write', 'posts', 'gallery', 'media', 'about', 'bgm', 'cats', 'settings'];
   function switchTab(name) {
     state.activeTab = name;
     document.querySelectorAll('.tab-btn').forEach(function (b) {
       b.classList.toggle('is-active', b.getAttribute('data-tab') === name);
     });
-    document.getElementById('tab-write').classList.toggle('hidden', name !== 'write');
-    document.getElementById('tab-posts').classList.toggle('hidden', name !== 'posts');
-    document.getElementById('tab-cats').classList.toggle('hidden', name !== 'cats');
-    document.getElementById('tab-settings').classList.toggle('hidden', name !== 'settings');
+    ALL_TABS.forEach(function (t) {
+      var panel = document.getElementById('tab-' + t);
+      if (panel) panel.classList.toggle('hidden', t !== name);
+    });
+    if (name === 'media' && typeof loadMedia === 'function') loadMedia();
   }
   document.querySelectorAll('.tab-btn').forEach(function (b) {
     b.addEventListener('click', function () { switchTab(b.getAttribute('data-tab')); });
@@ -1711,6 +1959,9 @@
       e.preventDefault();
       if (state.activeTab === 'write' && !saveBtn.disabled) saveBtn.click();
       else if (state.activeTab === 'settings' && !saveSettingsBtn.disabled) saveSettingsBtn.click();
+      else if (state.activeTab === 'gallery') document.getElementById('save-gallery-btn').click();
+      else if (state.activeTab === 'about') document.getElementById('save-about-btn').click();
+      else if (state.activeTab === 'bgm') document.getElementById('save-bgm-btn').click();
     }
   });
 
@@ -2183,6 +2434,7 @@
     fCover.value = '';
     fContent.value = '';
     fDraft.checked = false;
+    if (fPinned) fPinned.checked = false;
     coverStatus.textContent = '';
     imgStatus.textContent = '';
     setUploadProgress(-1);
@@ -2230,6 +2482,7 @@
       summary: fSummary.value.trim(),
       cover: fCover.value.trim(),
       draft: fDraft.checked ? 'true' : 'false',
+      pinned: (fPinned && fPinned.checked) ? 'true' : 'false',
       content: fContent.value
     };
     api('POST', '/api/studio/posts', payload)
@@ -2334,6 +2587,7 @@
         ? '<img class="post-row-thumb" src="' + esc(p.cover) + '" alt="" loading="lazy">'
         : '';
       var catBadge = p.category ? '<span class="badge badge-lilac">✦ ' + esc(p.category) + '</span>' : '';
+      var pinBadge = p.pinned ? '<span class="badge badge-pink">📌 置顶</span>' : '';
       var draftBadge = p.draft ? '<span class="badge badge-draft">草稿</span>' : '<span class="badge">已发布</span>';
       var toggleLabel = p.draft ? '立即发布' : '转草稿';
       return (
@@ -2342,7 +2596,7 @@
           '<div class="post-row-info">' +
             '<div class="post-row-title">' + esc(p.title) + '</div>' +
             '<div class="post-row-meta">' +
-              draftBadge + catBadge +
+              pinBadge + draftBadge + catBadge +
               '<span>' + esc(p.date) + '</span>' +
               '<span>/' + esc(p.slug) + '</span>' +
             '</div>' +
@@ -2389,6 +2643,7 @@
           fCover.value = p.cover || '';
           fContent.value = p.content || '';
           fDraft.checked = !!p.draft;
+          if (fPinned) fPinned.checked = !!p.pinned;
           renderCats();
           fCat.value = p.category || '';
           syncCoverUI();
@@ -2422,6 +2677,7 @@
             summary: p.summary || '',
             cover: p.cover || '',
             draft: nextDraft ? 'true' : 'false',
+            pinned: p.pinned ? 'true' : 'false',
             content: p.content || ''
           }).then(function () { return nextDraft; });
         })
@@ -2658,16 +2914,583 @@
       .finally(function () { saveSettingsBtn.disabled = false; });
   });
 
+  /* =========================================================
+     Curated Illustration Gallery (100% Author-Picked)
+     ========================================================= */
+  var galDrop = document.getElementById('gal-drop');
+  var galFiles = document.getElementById('gal-files');
+  var galStatus = document.getElementById('gal-status');
+  var galAdminList = document.getElementById('gal-admin-list');
+  var saveGalleryBtn = document.getElementById('save-gallery-btn');
+
+  function renderGalleryAdmin() {
+    if (cntGallery) cntGallery.textContent = String(state.gallery.length);
+    if (!galAdminList) return;
+    if (!state.gallery.length) {
+      galAdminList.innerHTML = '<p style="color:var(--muted);grid-column:1/-1;text-align:center;padding:24px 0">精选画廊还是空的～ 点击上方上传高质量美图，或去「🗂️ 媒体库」挑图加进来吧 ✦</p>';
+      return;
+    }
+    galAdminList.innerHTML = state.gallery.map(function (it, idx) {
+      var fullHref = extractOrigUrl(it.url) || it.url;
+      return (
+        '<div class="gal-admin-card" data-gidx="' + idx + '">' +
+          '<a href="' + esc(fullHref) + '" target="_blank" rel="noopener" title="新窗口查看完整原图">' +
+            '<img class="gal-admin-thumb" src="' + esc(it.url) + '" alt="' + esc(it.title || '') + '" loading="lazy">' +
+          '</a>' +
+          '<div class="gal-admin-body">' +
+            '<input class="inp" type="text" data-gfield="title" value="' + esc(it.title || '') + '" placeholder="作品标题（选填）">' +
+            '<input class="inp" type="text" data-gfield="tag" value="' + esc(it.tag || '') + '" placeholder="分类标签（如：原画 / 壁纸 / 摄影）">' +
+            '<input class="inp" type="text" data-gfield="note" value="' + esc(it.note || '') + '" placeholder="配文或画师出处（选填）">' +
+            '<div class="gal-admin-ops">' +
+              '<div style="display:flex;gap:5px">' +
+                '<button class="btn btn-sm" type="button" data-gact="up" title="前移">↑</button>' +
+                '<button class="btn btn-sm" type="button" data-gact="down" title="后移">↓</button>' +
+              '</div>' +
+              '<button class="btn btn-danger btn-sm" type="button" data-gact="del">移出画廊</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function saveGalleryNow(silentToast) {
+    if (saveGalleryBtn) saveGalleryBtn.disabled = true;
+    return api('POST', '/api/studio/gallery', state.gallery)
+      .then(function () {
+        if (!silentToast) showToast('精选画廊已保存并同步到前台 ✦ <a href="/gallery/" target="_blank">查看画廊 ↗</a>');
+        if (cntGallery) cntGallery.textContent = String(state.gallery.length);
+      })
+      .catch(function (err) { showToast(esc(err.message), true); })
+      .finally(function () { if (saveGalleryBtn) saveGalleryBtn.disabled = false; });
+  }
+
+  function handleGalleryUpload(fileList) {
+    var imgs = Array.prototype.slice.call(fileList || []).filter(function (f) {
+      return f && f.type && f.type.indexOf('image/') === 0;
+    });
+    if (!imgs.length) return;
+    galStatus.textContent = '正在上传 ' + imgs.length + ' 张高清美图...';
+    var chain = Promise.resolve();
+    var added = 0;
+    imgs.forEach(function (file, idx) {
+      chain = chain.then(function () {
+        galStatus.textContent = '上传中 (' + (idx + 1) + '/' + imgs.length + ')...';
+        return uploadImageFile(file).then(function (url) {
+          var title = (file.name || '').replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+          state.gallery.unshift({
+            id: 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+            url: url,
+            title: title,
+            tag: '',
+            note: '',
+            date: todayStr()
+          });
+          added++;
+          renderGalleryAdmin();
+        });
+      });
+    });
+    chain
+      .then(function () {
+        galStatus.textContent = '已添加 ' + added + ' 张作品 ✦';
+        return saveGalleryNow(false);
+      })
+      .catch(function (err) {
+        galStatus.textContent = '';
+        showToast(esc(err.message), true);
+      });
+  }
+
+  if (galAdminList) {
+    galAdminList.addEventListener('input', function (e) {
+      var fld = e.target.getAttribute('data-gfield');
+      var card = e.target.closest('[data-gidx]');
+      if (!fld || !card) return;
+      var i = parseInt(card.getAttribute('data-gidx'), 10);
+      if (state.gallery[i]) state.gallery[i][fld] = e.target.value;
+    });
+    galAdminList.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-gact]');
+      var card = e.target.closest('[data-gidx]');
+      if (!btn || !card) return;
+      var i = parseInt(card.getAttribute('data-gidx'), 10);
+      var act = btn.getAttribute('data-gact');
+      if (act === 'up' && i > 0) {
+        var tmp = state.gallery[i - 1]; state.gallery[i - 1] = state.gallery[i]; state.gallery[i] = tmp;
+        renderGalleryAdmin();
+      } else if (act === 'down' && i < state.gallery.length - 1) {
+        var tmp2 = state.gallery[i + 1]; state.gallery[i + 1] = state.gallery[i]; state.gallery[i] = tmp2;
+        renderGalleryAdmin();
+      } else if (act === 'del') {
+        state.gallery.splice(i, 1);
+        renderGalleryAdmin();
+        saveGalleryNow(true).then(function () { showToast('已从画廊移出（原图仍保留在媒体库）'); });
+      }
+    });
+  }
+  document.getElementById('gal-upload-btn').addEventListener('click', function () { galFiles.click(); });
+  document.getElementById('gal-pick-media-btn').addEventListener('click', function () { switchTab('media'); });
+  galFiles.addEventListener('change', function () {
+    handleGalleryUpload(galFiles.files);
+    galFiles.value = '';
+  });
+  galDrop.addEventListener('dragover', function (e) { e.preventDefault(); galDrop.classList.add('is-drag'); });
+  galDrop.addEventListener('dragleave', function () { galDrop.classList.remove('is-drag'); });
+  galDrop.addEventListener('drop', function (e) {
+    e.preventDefault();
+    galDrop.classList.remove('is-drag');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      handleGalleryUpload(e.dataTransfer.files);
+    }
+  });
+  saveGalleryBtn.addEventListener('click', function () { saveGalleryNow(false); });
+
+  /* =========================================================
+     Media Library & Safe Unused / Orphan Cleanup
+     ========================================================= */
+  var mediaGrid = document.getElementById('media-grid');
+  var mediaSearch = document.getElementById('media-search');
+  var mediaStatsBadge = document.getElementById('media-stats-badge');
+  var mediaCleanBtn = document.getElementById('media-clean-btn');
+
+  function fmtBytes(n) {
+    n = Number(n || 0);
+    if (n >= 1048576) return (n / 1048576).toFixed(2) + ' MB';
+    if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+    return n + ' B';
+  }
+  function isImgName(name) { return /\.(jpg|jpeg|png|webp|gif)$/i.test(name || ''); }
+  function isAudioName(name) { return /\.(mp3|m4a|flac|wav|oga)$/i.test(name || ''); }
+  function isVidName(name) { return /\.(mp4|webm|mov|m4v|ogg|ogv)$/i.test(name || ''); }
+
+  function renderMedia() {
+    if (!mediaGrid) return;
+    if (cntMedia) cntMedia.textContent = String(state.media.length);
+    var totalBytes = 0, unusedCnt = 0, unusedBytes = 0;
+    state.media.forEach(function (m) {
+      totalBytes += (m.size || 0);
+      if (!m.used || m.part) { unusedCnt++; unusedBytes += (m.size || 0); }
+    });
+    if (mediaStatsBadge) {
+      mediaStatsBadge.textContent = '共 ' + state.media.length + ' 项 · ' + fmtBytes(totalBytes) +
+        (unusedCnt ? (' · 可清理 ' + unusedCnt + ' 项 (' + fmtBytes(unusedBytes) + ')') : ' · 全部在使用');
+    }
+    if (!state.media.length) {
+      mediaGrid.innerHTML = '<p style="color:var(--muted);grid-column:1/-1;text-align:center;padding:24px 0">媒体库目前空空如也～</p>';
+      return;
+    }
+    var q = mediaSearch ? mediaSearch.value.trim().toLowerCase() : '';
+    var mf = state.mediaFilter || 'all';
+    var items = state.media.slice().sort(function (a, b) { return (b.mtime || 0) - (a.mtime || 0); }).filter(function (m) {
+      if (mf === 'img' && (!isImgName(m.name) || m.part)) return false;
+      if (mf === 'av' && (!(isVidName(m.name) || isAudioName(m.name)) || m.part)) return false;
+      if (mf === 'unused' && m.used && !m.part) return false;
+      if (q && (m.name || '').toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+    if (!items.length) {
+      mediaGrid.innerHTML = '<p style="color:var(--muted);grid-column:1/-1;text-align:center;padding:24px 0">当前筛选下没有匹配的媒体文件～</p>';
+      return;
+    }
+    mediaGrid.innerHTML = items.map(function (m) {
+      var prevHtml;
+      if (m.part) {
+        prevHtml = '<div class="media-icon-box"><span>⚠️ 残留分片</span><small>.part 临时文件</small></div>';
+      } else if (isImgName(m.name)) {
+        prevHtml = '<a href="' + esc(m.url) + '" target="_blank" rel="noopener"><img class="media-thumb" src="' + esc(m.url) + '" alt="" loading="lazy"></a>';
+      } else if (isAudioName(m.name)) {
+        prevHtml = '<div class="media-icon-box"><span>🎵 音频文件</span><small>' + esc(m.name.split('.').pop().toUpperCase()) + '</small></div>';
+      } else if (isVidName(m.name)) {
+        prevHtml = '<div class="media-icon-box"><span>🎬 视频文件</span><small>' + esc(m.name.split('.').pop().toUpperCase()) + '</small></div>';
+      } else {
+        prevHtml = '<div class="media-icon-box"><span>📄 文件</span></div>';
+      }
+      var statusBadge = m.part
+        ? '<span class="badge badge-draft">⚠️ 残留碎片</span>'
+        : (m.used ? '<span class="badge badge-ok">✅ 使用中</span>' : '<span class="badge badge-muted">⚪ 未使用</span>');
+      var galBtn = (!m.part && isImgName(m.name))
+        ? '<button class="btn btn-pink btn-sm" type="button" data-mact="addgal" data-murl="' + esc(m.url) + '" data-mname="' + esc(m.name) + '">🖼️ 加画廊</button>'
+        : '';
+      var copyBtn = !m.part
+        ? '<button class="btn btn-soft btn-sm" type="button" data-mact="copy" data-murl="' + esc(m.url) + '">复制</button>'
+        : '';
+      return (
+        '<div class="media-card">' +
+          prevHtml +
+          '<div class="media-body">' +
+            '<div class="media-name">' + esc(m.name) + '</div>' +
+            '<div class="media-meta">' + statusBadge + '<span>' + fmtBytes(m.size) + '</span></div>' +
+            '<div class="media-ops">' +
+              copyBtn + galBtn +
+              '<button class="btn btn-danger btn-sm" type="button" data-mact="del" data-mname="' + esc(m.name) + '" data-mused="' + (m.used ? '1' : '0') + '">删除</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function loadMedia() {
+    return api('GET', '/api/studio/media')
+      .then(function (list) {
+        state.media = Array.isArray(list) ? list : [];
+        renderMedia();
+      })
+      .catch(function (err) { showToast(esc(err.message), true); });
+  }
+
+  if (mediaSearch) mediaSearch.addEventListener('input', renderMedia);
+  document.querySelectorAll('.filter-pill[data-media-filter]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      state.mediaFilter = btn.getAttribute('data-media-filter') || 'all';
+      document.querySelectorAll('.filter-pill[data-media-filter]').forEach(function (b) {
+        b.classList.toggle('is-active', b === btn);
+      });
+      renderMedia();
+    });
+  });
+  document.getElementById('media-refresh-btn').addEventListener('click', function () {
+    loadMedia().then(function () { showToast('媒体库扫描已刷新 ✦'); });
+  });
+  mediaCleanBtn.addEventListener('click', function () {
+    var targets = state.media.filter(function (m) { return !m.used || m.part; });
+    if (!targets.length) { showToast('太棒了，当前没有任何未使用文件或残留分片 ✦'); return; }
+    var sumB = targets.reduce(function (acc, m) { return acc + (m.size || 0); }, 0);
+    if (!confirm('确定要永久清理 ' + targets.length + ' 个未使用文件/残留碎片（预计释放 ' + fmtBytes(sumB) + '）吗？所有文章、画廊、头像、头图和歌单正在使用的文件都会完好保留。')) return;
+    mediaCleanBtn.disabled = true;
+    var chain = Promise.resolve();
+    var ok = 0;
+    targets.forEach(function (m) {
+      chain = chain.then(function () {
+        return api('POST', '/api/studio/media/delete', { name: m.name }).then(function () { ok++; }).catch(function () {});
+      });
+    });
+    chain
+      .then(function () {
+        showToast('已清理 ' + ok + ' 个冗余文件，释放 ' + fmtBytes(sumB) + ' ✦');
+        return loadMedia();
+      })
+      .finally(function () { mediaCleanBtn.disabled = false; });
+  });
+  if (mediaGrid) {
+    mediaGrid.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-mact]');
+      if (!btn) return;
+      var act = btn.getAttribute('data-mact');
+      if (act === 'copy') {
+        var u = btn.getAttribute('data-murl') || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(u).then(function () { showToast('链接已复制：' + esc(u)); });
+        } else {
+          showToast('地址：' + esc(u));
+        }
+      } else if (act === 'addgal') {
+        var gurl = btn.getAttribute('data-murl') || '';
+        if (state.gallery.some(function (it) { return it.url === gurl; })) {
+          showToast('这张图片已经在精选画廊里啦～');
+          return;
+        }
+        state.gallery.unshift({
+          id: 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          url: gurl,
+          title: '',
+          tag: '',
+          note: '',
+          date: todayStr()
+        });
+        renderGalleryAdmin();
+        saveGalleryNow(true).then(function () {
+          showToast('已挑选加入精选画廊 ✦');
+          return loadMedia();
+        });
+      } else if (act === 'del') {
+        var name = btn.getAttribute('data-mname') || '';
+        var used = btn.getAttribute('data-mused') === '1';
+        var msg = used
+          ? '⚠️ 文件「' + name + '」目前仍被文章、画廊或站点设置引用！删除后前台可能出现裂图，确定仍要删除吗？'
+          : '确定永久删除文件「' + name + '」吗？';
+        if (!confirm(msg)) return;
+        api('POST', '/api/studio/media/delete', { name: name })
+          .then(function () {
+            showToast('已删除文件 ' + esc(name) + ' ✦');
+            return loadMedia();
+          })
+          .catch(function (err) { showToast(esc(err.message), true); });
+      }
+    });
+  }
+
+  /* =========================================================
+     About Me & Friends Wall Admin
+     ========================================================= */
+  var abBio = document.getElementById('ab-bio');
+  var abTags = document.getElementById('ab-tags');
+  var abSocialsList = document.getElementById('ab-socials-list');
+  var abFriendsList = document.getElementById('ab-friends-list');
+  var saveAboutBtn = document.getElementById('save-about-btn');
+
+  function renderAboutAdmin() {
+    if (!abBio) return;
+    abBio.value = state.about.bio || '';
+    abTags.value = Array.isArray(state.about.tags) ? state.about.tags.join(', ') : '';
+
+    var socs = Array.isArray(state.about.socials) ? state.about.socials : [];
+    abSocialsList.innerHTML = socs.length ? socs.map(function (s, idx) {
+      return (
+        '<div class="dyn-row" data-sidx="' + idx + '">' +
+          '<input class="inp" type="text" data-sfield="label" value="' + esc(s.label || '') + '" placeholder="平台名（如 GitHub / B站 / Pixiv）">' +
+          '<input class="inp" type="text" data-sfield="url" value="' + esc(s.url || '') + '" placeholder="https://...">' +
+          '<div class="dyn-row-ops"><button class="btn btn-danger btn-sm" type="button" data-sdel="1">删除</button></div>' +
+        '</div>'
+      );
+    }).join('') : '<p class="field-hint">暂未添加社交链接，点右上角「+ 添加社交链接」添加～</p>';
+
+    var frs = Array.isArray(state.about.friends) ? state.about.friends : [];
+    abFriendsList.innerHTML = frs.length ? frs.map(function (f, idx) {
+      return (
+        '<div class="dyn-row" data-fidx="' + idx + '">' +
+          '<input class="inp" type="text" data-ffield="name" value="' + esc(f.name || '') + '" placeholder="小伙伴昵称 / 站名">' +
+          '<input class="inp" type="text" data-ffield="url" value="' + esc(f.url || '') + '" placeholder="网站地址 https://...">' +
+          '<input class="inp" type="text" data-ffield="avatar" value="' + esc(f.avatar || '') + '" placeholder="头像地址（选填）">' +
+          '<input class="inp" type="text" data-ffield="desc" value="' + esc(f.desc || '') + '" placeholder="一句话简介">' +
+          '<div class="dyn-row-ops">' +
+            '<button class="btn btn-sm" type="button" data-fact="up">↑</button>' +
+            '<button class="btn btn-sm" type="button" data-fact="down">↓</button>' +
+            '<button class="btn btn-danger btn-sm" type="button" data-fact="del">删除</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('') : '<p class="field-hint">还没有添加友链，点右上角「+ 添加小伙伴友链」点亮友链星海吧～</p>';
+  }
+
+  document.getElementById('ab-add-social').addEventListener('click', function () {
+    if (!Array.isArray(state.about.socials)) state.about.socials = [];
+    state.about.socials.push({ label: '', url: '' });
+    renderAboutAdmin();
+  });
+  document.getElementById('ab-add-friend').addEventListener('click', function () {
+    if (!Array.isArray(state.about.friends)) state.about.friends = [];
+    state.about.friends.push({ name: '', url: '', avatar: '', desc: '' });
+    renderAboutAdmin();
+  });
+  abSocialsList.addEventListener('input', function (e) {
+    var row = e.target.closest('[data-sidx]');
+    var fld = e.target.getAttribute('data-sfield');
+    if (!row || !fld) return;
+    var i = parseInt(row.getAttribute('data-sidx'), 10);
+    if (state.about.socials[i]) state.about.socials[i][fld] = e.target.value;
+  });
+  abSocialsList.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-sdel]')) return;
+    var row = e.target.closest('[data-sidx]');
+    if (!row) return;
+    state.about.socials.splice(parseInt(row.getAttribute('data-sidx'), 10), 1);
+    renderAboutAdmin();
+  });
+  abFriendsList.addEventListener('input', function (e) {
+    var row = e.target.closest('[data-fidx]');
+    var fld = e.target.getAttribute('data-ffield');
+    if (!row || !fld) return;
+    var i = parseInt(row.getAttribute('data-fidx'), 10);
+    if (state.about.friends[i]) state.about.friends[i][fld] = e.target.value;
+  });
+  abFriendsList.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-fact]');
+    var row = e.target.closest('[data-fidx]');
+    if (!btn || !row) return;
+    var i = parseInt(row.getAttribute('data-fidx'), 10);
+    var act = btn.getAttribute('data-fact');
+    if (act === 'up' && i > 0) {
+      var t = state.about.friends[i - 1]; state.about.friends[i - 1] = state.about.friends[i]; state.about.friends[i] = t;
+      renderAboutAdmin();
+    } else if (act === 'down' && i < state.about.friends.length - 1) {
+      var t2 = state.about.friends[i + 1]; state.about.friends[i + 1] = state.about.friends[i]; state.about.friends[i] = t2;
+      renderAboutAdmin();
+    } else if (act === 'del') {
+      state.about.friends.splice(i, 1);
+      renderAboutAdmin();
+    }
+  });
+  saveAboutBtn.addEventListener('click', function () {
+    state.about.bio = abBio.value || '';
+    state.about.tags = (abTags.value || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    state.about.socials = (state.about.socials || []).filter(function (s) { return s && (s.label || '').trim() && (s.url || '').trim(); });
+    state.about.friends = (state.about.friends || []).filter(function (f) { return f && (f.name || '').trim() && (f.url || '').trim(); });
+    saveAboutBtn.disabled = true;
+    api('POST', '/api/studio/about', state.about)
+      .then(function () {
+        renderAboutAdmin();
+        showToast('关于与友链已保存生效 ✦ <a href="/about/" target="_blank">立即查看 ↗</a>');
+      })
+      .catch(function (err) { showToast(esc(err.message), true); })
+      .finally(function () { saveAboutBtn.disabled = false; });
+  });
+
+  /* =========================================================
+     BGM Playlist Admin (PJAX Continuous Mini Vinyl Player)
+     ========================================================= */
+  var bgmFiles = document.getElementById('bgm-files');
+  var bgmStatus = document.getElementById('bgm-status');
+  var bgmAdminList = document.getElementById('bgm-admin-list');
+  var saveBgmBtn = document.getElementById('save-bgm-btn');
+
+  function uploadAudioChunked(file, onProgress) {
+    var MAX_AUD = 104857600;
+    var CHUNK = 1048576;
+    if (!file || !file.size) return Promise.reject(new Error('请选择有效的音频文件'));
+    if (file.size > MAX_AUD) return Promise.reject(new Error('音频超过 100MB 限制'));
+    var total = file.size;
+    function sendChunk(offset, aid) {
+      var end = Math.min(total, offset + CHUNK);
+      var isDone = end >= total ? 1 : 0;
+      var qs = '?done=' + isDone + (aid ? ('&id=' + encodeURIComponent(aid)) : '');
+      return fetch('/api/studio/upload-audio' + qs, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: file.slice(offset, end)
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (r.status === 401) { showGate(); throw new Error('登录已过期'); }
+          if (!r.ok) throw new Error(d.error || '音频上传失败');
+          if (onProgress) onProgress(end, total);
+          if (isDone) {
+            if (!d.url) throw new Error('音频上传完成但未返回地址');
+            return d.url;
+          }
+          return sendChunk(end, d.id);
+        });
+      });
+    }
+    return sendChunk(0, '');
+  }
+
+  function renderBgmAdmin() {
+    if (cntBgm) cntBgm.textContent = String(state.bgm.length);
+    if (!bgmAdminList) return;
+    if (!state.bgm.length) {
+      bgmAdminList.innerHTML = '<p class="field-hint" style="text-align:center;padding:18px 0">当前歌单为空（前台自动隐藏唱片机）。上传喜欢的二次元纯音乐 / OST 即可开启！</p>';
+      return;
+    }
+    bgmAdminList.innerHTML = state.bgm.map(function (t, idx) {
+      return (
+        '<div class="dyn-row" data-bidx="' + idx + '">' +
+          '<input class="inp" type="text" data-bfield="title" value="' + esc(t.title || '') + '" placeholder="曲目名称">' +
+          '<input class="inp" type="text" data-bfield="artist" value="' + esc(t.artist || '') + '" placeholder="歌手 / 出处（选填）">' +
+          '<input class="inp" type="text" data-bfield="url" value="' + esc(t.url || '') + '" placeholder="/uploads/...mp3 或外链">' +
+          '<div class="dyn-row-ops">' +
+            '<button class="btn btn-sm" type="button" data-bact="up">↑</button>' +
+            '<button class="btn btn-sm" type="button" data-bact="down">↓</button>' +
+            '<button class="btn btn-danger btn-sm" type="button" data-bact="del">删除</button>' +
+          '</div>' +
+          (t.url ? '<audio class="bgm-audio-mini" style="grid-column:1/-1" controls preload="none" src="' + esc(t.url) + '"></audio>' : '') +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function saveBgmNow() {
+    var clean = (state.bgm || []).filter(function (t) { return t && (t.url || '').trim(); });
+    state.bgm = clean;
+    saveBgmBtn.disabled = true;
+    return api('POST', '/api/studio/bgm', state.bgm)
+      .then(function () {
+        renderBgmAdmin();
+        showToast(state.bgm.length ? '音乐歌单已保存生效 ♪（前台左下角唱片机已就绪）' : '歌单已清空，前台已隐藏唱片机');
+      })
+      .catch(function (err) { showToast(esc(err.message), true); })
+      .finally(function () { saveBgmBtn.disabled = false; });
+  }
+
+  document.getElementById('bgm-upload-btn').addEventListener('click', function () { bgmFiles.click(); });
+  document.getElementById('bgm-add-row').addEventListener('click', function () {
+    state.bgm.push({ title: '', artist: '', url: '' });
+    renderBgmAdmin();
+  });
+  bgmFiles.addEventListener('change', function () {
+    var arr = Array.prototype.slice.call(bgmFiles.files || []);
+    bgmFiles.value = '';
+    if (!arr.length) return;
+    var chain = Promise.resolve();
+    var added = 0;
+    arr.forEach(function (file, idx) {
+      chain = chain.then(function () {
+        bgmStatus.textContent = '🎵 上传中 (' + (idx + 1) + '/' + arr.length + ') 0%...';
+        return uploadAudioChunked(file, function (sent, total) {
+          bgmStatus.textContent = '🎵 上传中 (' + (idx + 1) + '/' + arr.length + ') ' + Math.round((sent / total) * 100) + '%...';
+        }).then(function (url) {
+          var title = (file.name || 'BGM').replace(/\.[^.]+$/, '').trim();
+          state.bgm.push({ title: title, artist: '', url: url });
+          added++;
+          renderBgmAdmin();
+        });
+      });
+    });
+    chain
+      .then(function () {
+        bgmStatus.textContent = '已上传 ' + added + ' 首曲目 ♪';
+        return saveBgmNow();
+      })
+      .catch(function (err) {
+        bgmStatus.textContent = '';
+        showToast(esc(err.message), true);
+      });
+  });
+  bgmAdminList.addEventListener('input', function (e) {
+    var row = e.target.closest('[data-bidx]');
+    var fld = e.target.getAttribute('data-bfield');
+    if (!row || !fld) return;
+    var i = parseInt(row.getAttribute('data-bidx'), 10);
+    if (state.bgm[i]) state.bgm[i][fld] = e.target.value;
+  });
+  bgmAdminList.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-bact]');
+    var row = e.target.closest('[data-bidx]');
+    if (!btn || !row) return;
+    var i = parseInt(row.getAttribute('data-bidx'), 10);
+    var act = btn.getAttribute('data-bact');
+    if (act === 'up' && i > 0) {
+      var t = state.bgm[i - 1]; state.bgm[i - 1] = state.bgm[i]; state.bgm[i] = t;
+      renderBgmAdmin();
+    } else if (act === 'down' && i < state.bgm.length - 1) {
+      var t2 = state.bgm[i + 1]; state.bgm[i + 1] = state.bgm[i]; state.bgm[i] = t2;
+      renderBgmAdmin();
+    } else if (act === 'del') {
+      state.bgm.splice(i, 1);
+      renderBgmAdmin();
+    }
+  });
+  saveBgmBtn.addEventListener('click', saveBgmNow);
+
   function refreshAll() {
     return Promise.all([
       api('GET', '/api/studio/posts'),
       api('GET', '/api/studio/categories'),
-      api('GET', '/api/studio/settings')
+      api('GET', '/api/studio/settings'),
+      fetch('/gallery.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return []; }),
+      fetch('/about.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return {}; }),
+      fetch('/bgm.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return []; }),
+      api('GET', '/api/studio/media').catch(function () { return []; })
     ]).then(function (res) {
       state.posts = Array.isArray(res[0]) ? res[0] : [];
       state.cats = Array.isArray(res[1]) ? res[1] : [];
+      state.gallery = Array.isArray(res[3]) ? res[3] : [];
+      var ab = (res[4] && typeof res[4] === 'object') ? res[4] : {};
+      state.about = {
+        bio: ab.bio || '',
+        tags: Array.isArray(ab.tags) ? ab.tags : [],
+        socials: Array.isArray(ab.socials) ? ab.socials : [],
+        friends: Array.isArray(ab.friends) ? ab.friends : []
+      };
+      state.bgm = Array.isArray(res[5]) ? res[5] : [];
+      state.media = Array.isArray(res[6]) ? res[6] : [];
       renderPosts();
       renderCats();
+      renderGalleryAdmin();
+      renderAboutAdmin();
+      renderBgmAdmin();
+      renderMedia();
       applySettingsUI(res[2]);
     });
   }

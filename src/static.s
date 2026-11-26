@@ -34,6 +34,11 @@ mime_mp4:       .asciz "video/mp4"
 mime_webm:      .asciz "video/webm"
 mime_mov:       .asciz "video/quicktime"
 mime_ogg:       .asciz "video/ogg"
+mime_mp3:       .asciz "audio/mpeg"
+mime_m4a:       .asciz "audio/mp4"
+mime_flac:      .asciz "audio/flac"
+mime_wav:       .asciz "audio/wav"
+mime_oga:       .asciz "audio/ogg"
 mime_bin:       .asciz "application/octet-stream"
 
 ext_css:   .ascii ".css"
@@ -54,6 +59,11 @@ ext_webm:  .ascii ".webm"
 ext_mov:   .ascii ".mov"
 ext_ogg:   .ascii ".ogg"
 ext_ogv:   .ascii ".ogv"
+ext_mp3:   .ascii ".mp3"
+ext_m4a:   .ascii ".m4a"
+ext_flac:  .ascii ".flac"
+ext_wav:   .ascii ".wav"
+ext_oga:   .ascii ".oga"
 
 fav_svg:
     .ascii "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><rect width=\"64\" height=\"64\" rx=\"14\" fill=\"#0f172a\"/><text x=\"32\" y=\"43\" font-family=\"monospace\" font-size=\"28\" font-weight=\"bold\" fill=\"#38bdf8\" text-anchor=\"middle\">0x</text></svg>"
@@ -128,6 +138,16 @@ mime_for_path:
     test eax, eax; jnz .Lm_ogg
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_ogv];   mov ecx, 4; call ends_with_ci
     test eax, eax; jnz .Lm_ogg
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_mp3];   mov ecx, 4; call ends_with_ci
+    test eax, eax; jnz .Lm_mp3
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_m4a];   mov ecx, 4; call ends_with_ci
+    test eax, eax; jnz .Lm_m4a
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_flac];  mov ecx, 5; call ends_with_ci
+    test eax, eax; jnz .Lm_flac
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_wav];   mov ecx, 4; call ends_with_ci
+    test eax, eax; jnz .Lm_wav
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + ext_oga];   mov ecx, 4; call ends_with_ci
+    test eax, eax; jnz .Lm_oga
     lea rax, [rip + mime_bin]; jmp .Lm_ret
 .Lm_css:   lea rax, [rip + mime_css];   jmp .Lm_ret
 .Lm_js:    lea rax, [rip + mime_js];    jmp .Lm_ret
@@ -143,7 +163,12 @@ mime_for_path:
 .Lm_mp4:   lea rax, [rip + mime_mp4];   jmp .Lm_ret
 .Lm_webm:  lea rax, [rip + mime_webm];  jmp .Lm_ret
 .Lm_mov:   lea rax, [rip + mime_mov];   jmp .Lm_ret
-.Lm_ogg:   lea rax, [rip + mime_ogg]
+.Lm_ogg:   lea rax, [rip + mime_ogg];   jmp .Lm_ret
+.Lm_mp3:   lea rax, [rip + mime_mp3];   jmp .Lm_ret
+.Lm_m4a:   lea rax, [rip + mime_m4a];   jmp .Lm_ret
+.Lm_flac:  lea rax, [rip + mime_flac];  jmp .Lm_ret
+.Lm_wav:   lea rax, [rip + mime_wav];   jmp .Lm_ret
+.Lm_oga:   lea rax, [rip + mime_oga]
 .Lm_ret:
     pop r13
     pop r12

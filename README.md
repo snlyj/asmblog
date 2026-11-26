@@ -5,8 +5,8 @@
 <h1 align="center">✦ AsmBlog — Pure x86-64 Assembly Anime Static Blog</h1>
 
 <p align="center">
-  <strong>~69 KiB 纯 x86-64 手写汇编零 <code>libc</code> 博客引擎 × 60/120fps 丝滑二次元「晴空星梦丝带」前端主题</strong><br/>
-  <em>A ~69 KiB zero-libc Linux x86-64 assembly static blog engine &amp; SSG paired with a silky anime theme, video streaming, and a hidden Author Studio.</em>
+  <strong>~74 KiB 纯 x86-64 手写汇编零 <code>libc</code> 博客引擎 × 60/120fps 丝滑二次元「晴空星梦丝带」前端主题</strong><br/>
+  <em>A ~74 KiB zero-libc Linux x86-64 assembly static blog engine &amp; SSG paired with a silky anime theme, video streaming, and a hidden Author Studio.</em>
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
 
 > [!TIP]
 > **🌐 在线体验 / Live Demo**：👉 **[https://jiehua.13-58-183-35.sslip.io/](https://jiehua.13-58-183-35.sslip.io/)**
-> 实际运行于纯 x86-64 `asmblog`（~69 KiB 单文件）+ Caddy 自动 HTTPS（HTTP/2 & HTTP/3），欢迎直接打开体验零白屏 PJAX 切页、双层 WebP/原图插画灯箱、在线视频流式播放、圆形水波纹昼夜模式、桌面/手机双端 60/120fps 顺滑度与站内极速搜索。
+> 实际运行于纯 x86-64 `asmblog`（~74 KiB 单文件）+ Caddy 自动 HTTPS（HTTP/2 & HTTP/3），欢迎直接打开体验零白屏 PJAX 切页、双层 WebP/原图插画灯箱、在线视频流式播放、圆形水波纹昼夜模式、桌面/手机双端 60/120fps 顺滑度与站内极速搜索。
 
 ---
 
@@ -29,7 +29,7 @@
 
 **AsmBlog** 是一个为个人写作与二次元同好打造的**纯 x86-64 Linux 汇编静态博客框架**——整个服务端、Markdown 解析器、模板引擎、静态站生成器（SSG）、HTTP 206 视频流服务、SHA-256 认证与隐藏写作后台全部由手写 Intel 语法汇编构建，直接调用 Linux `syscall`，**不依赖 `glibc`、不依赖任何第三方库、不需要数据库**。
 
-- **硬核到极致的内核**：静态链接剥离后仅 **~69 KiB**，单线程 `epoll` + 零拷贝 `sendfile`（支持 HTTP `Range` / `206` 视频拖拽播放与 256 KiB 公平分片防阻塞）+ `inotify` 热重载，空闲内存 **`300 KiB`**，20 并发压测 **`2,100–2,400+ req/s`**，文件句柄零泄漏；支持 **`FROM scratch`** 极简 Docker 镜像。
+- **硬核到极致的内核**：静态链接剥离后仅 **~74 KiB**，单线程 `epoll` + 零拷贝 `sendfile`（支持 HTTP `Range` / `206` 视频拖拽播放与 256 KiB 公平分片防阻塞）+ `inotify` 热重载，空闲内存 **`300 KiB`**，20 并发压测 **`2,100–2,400+ req/s`**，文件句柄零泄漏；支持 **`FROM scratch`** 极简 Docker 镜像。
 - **软萌到极致的前端**：内置二次元少女风主题 **「晴空星梦丝带 (Sky Ribbon)」**，附带原创晴空插画头图、蝴蝶结头像与 404 萌图，严格杜绝 `backdrop-filter` / `filter: blur` / `100dvh` 滚动卡顿，在手机和桌面端都能保持 60/120fps 顺滑体验。
 
 ---
@@ -66,7 +66,7 @@
 
 | 指标 | AsmBlog（实测值） | 传统动态博客 (PHP/Node/Python) |
 | :--- | :--- | :--- |
-| 静态可执行文件体积 | **`~69 KiB`**（零动态库依赖） | 30 MB – 200+ MB |
+| 静态可执行文件体积 | **`~74 KiB`**（零动态库依赖） | 30 MB – 200+ MB |
 | 服务端内存占用 (`VmRSS`) | 空闲 **`300 KiB`** / 压测后 **`392 KiB`** | 80 MB – 500+ MB |
 | 20 并发吞吐量（2,000 请求） | **`2,131 – 2,444 req/s`**（`2000/2000 OK`） | 100 – 800 req/s |
 | HTTPS 压缩后首屏代码体积 | HTML **`3.2 KB`** + CSS **`10.1 KB`** + JS **`7.8 KB`** ≈ **`21 KB`** | 300 KB – 2+ MB |
@@ -83,7 +83,7 @@
 git clone https://github.com/snlyj/asmblog.git
 cd asmblog
 
-# 从 GitHub Releases 下载仅 ~69 KiB 的 Linux x86_64 静态二进制
+# 从 GitHub Releases 下载仅 ~74 KiB 的 Linux x86_64 静态二进制
 curl -fsSL -o asmblog https://github.com/snlyj/asmblog/releases/latest/download/asmblog-linux-x86_64
 chmod +x asmblog
 
