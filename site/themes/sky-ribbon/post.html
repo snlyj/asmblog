@@ -1,5 +1,5 @@
 <div class="feed-wrap">
-  <article class="article-card reveal" data-post-slug="{{ slug }}">
+  <article class="article-card reveal" data-post-slug="{{ slug }}" data-post-cat="{{ category }}">
     <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
     {{#is_draft}}<div class="draft-preview-banner">📝 草稿预览模式 · 仅当前已登录博主可见（公开访客将看到 404）</div>{{/is_draft}}
     <header class="article-header">
@@ -54,6 +54,8 @@
     <div class="post-nav-slot">{{#prev_slug}}<a class="post-nav-card" href="/post/{{ prev_slug }}/"><span class="post-nav-label">&larr; 上一篇</span><span class="post-nav-title">{{ prev_title }}</span></a>{{/prev_slug}}</div>
     <div class="post-nav-slot">{{#next_slug}}<a class="post-nav-card post-nav-right" href="/post/{{ next_slug }}/"><span class="post-nav-label">下一篇 &rarr;</span><span class="post-nav-title">{{ next_title }}</span></a>{{/next_slug}}</div>
   </nav>
+
+  <section id="related-posts" class="related-card reveal hidden" aria-label="相关文章推荐"></section>
 
   {{#giscus_repo}}
   <section id="comments-card" class="comments-card reveal"

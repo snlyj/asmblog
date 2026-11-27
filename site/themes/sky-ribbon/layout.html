@@ -15,9 +15,11 @@
   <meta name="twitter:title" content="{{ og_title }}">
   <meta name="twitter:description" content="{{ og_desc }}">
   {{#og_image}}<meta name="twitter:image" content="{{ og_image }}">{{/og_image}}
+  <meta name="theme-color" content="#f2f8ff">
+  <link rel="manifest" href="/static/manifest.json">
   <link rel="icon" type="image/svg+xml" href="/static/favicon-ribbon.svg?v=2">
   <link rel="alternate" type="application/rss+xml" title="{{ site_name }} RSS" href="/rss.xml">
-  <link rel="stylesheet" href="/static/sky-ribbon.css?v=18">
+  <link rel="stylesheet" href="/static/sky-ribbon.css?v=19">
   <script>
     (function(){
       var d = document.documentElement, t = null, fx = null, fs = null;
@@ -27,7 +29,10 @@
         fs = localStorage.getItem('asmblog-font');
       } catch (_) {}
       if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
-      d.setAttribute('data-theme', t || 'light');
+      var mode = t || 'light';
+      d.setAttribute('data-theme', mode);
+      var tc = document.querySelector('meta[name="theme-color"]');
+      if (tc) tc.setAttribute('content', mode === 'dark' ? '#0b1224' : '#f2f8ff');
       if (fx === 'off') d.setAttribute('data-fx', 'off');
       if (fs === 'sm' || fs === 'lg') d.setAttribute('data-font', fs);
     })();
@@ -43,6 +48,6 @@
   </div>
 
   {{> footer }}
-  <script src="/static/sky-ribbon.js?v=18" defer></script>
+  <script src="/static/sky-ribbon.js?v=19" defer></script>
 </body>
 </html>

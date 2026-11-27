@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#f6fbff">
+  <link rel="manifest" href="/static/manifest.json">
   <title>✦ 作者写作室 · AsmBlog Studio</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon-ribbon.svg?v=2">
   <script>
@@ -11,7 +13,10 @@
       var t = null;
       try { t = localStorage.getItem('asmblog-theme'); } catch (_) {}
       if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
-      document.documentElement.setAttribute('data-theme', t || 'light');
+      var mode = t || 'light';
+      document.documentElement.setAttribute('data-theme', mode);
+      var tc = document.querySelector('meta[name="theme-color"]');
+      if (tc) tc.setAttribute('content', mode === 'dark' ? '#0b1224' : '#f6fbff');
     })();
   </script>
   <style>
@@ -882,6 +887,93 @@
     .backup-card h3 { margin: 0 0 4px; font-size: 0.98rem; color: var(--fg); }
     .backup-card p { margin: 0; font-size: 0.82rem; color: var(--muted); }
 
+    /* Password reveal, tag suggestion chips, summary row & Media Picker Modal */
+    .pass-wrap { position: relative; display: flex; align-items: center; }
+    .pass-wrap .inp { padding-right: 42px; }
+    .pass-eye {
+      position: absolute;
+      right: 8px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pass-eye:hover { color: var(--sky-fg); background: var(--sky-soft); }
+    .tag-suggest-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .tag-suggest-chips:empty { display: none; }
+    .tag-sug-chip {
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--fg-2);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .tag-sug-chip.is-picked, .tag-sug-chip:hover {
+      border-color: var(--sky);
+      background: var(--sky-soft);
+      color: var(--sky-fg);
+    }
+    .summary-row { display: flex; gap: 8px; align-items: center; }
+    .summary-row .inp { flex: 1; }
+    .mp-dialog {
+      width: min(720px, 100%);
+      max-height: 84vh;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--surface);
+      border: 1.5px solid var(--border-strong);
+      border-radius: 24px;
+      padding: 18px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+    }
+    .mp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+      gap: 10px;
+      overflow-y: auto;
+      max-height: 54vh;
+      padding-right: 4px;
+    }
+    .mp-item {
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--surface-soft);
+      padding: 0;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .mp-item:hover { border-color: var(--pink); transform: translateY(-2px); }
+    .mp-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: var(--sky-soft); }
+    .mp-item span {
+      padding: 6px 8px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+
     /* Toast */
     .toast {
       position: fixed;
@@ -931,7 +1023,10 @@
     <h1>✦ 作者秘密写作室</h1>
     <p class="gate-sub">仅博主本人可见 · 请输入写作口令解锁</p>
     <form id="login-form" class="gate-form">
-      <input id="login-pass" class="inp" type="password" placeholder="输入作者口令..." autocomplete="current-password" required>
+      <div class="pass-wrap">
+        <input id="login-pass" class="inp" type="password" placeholder="输入作者口令..." autocomplete="current-password" required>
+        <button id="toggle-pass-btn" class="pass-eye" type="button" title="显示 / 隐藏口令" aria-label="显示或隐藏口令">👁️</button>
+      </div>
       <button id="login-btn" class="btn btn-primary" type="submit">解锁写作室 ✦</button>
     </form>
     <p id="login-err" class="field-hint" style="color:var(--danger);margin-top:10px;min-height:1.2em"></p>
@@ -998,8 +1093,9 @@
       </div>
 
       <div class="field">
-        <label for="f-tags">标签（多个用英文逗号分隔）</label>
+        <label for="f-tags">标签（支持中英文逗号分隔，点下方常用标签快速填入）</label>
         <input id="f-tags" class="inp" type="text" placeholder="例如：日常, 插画, 随笔">
+        <div id="tag-suggest-chips" class="tag-suggest-chips"></div>
       </div>
 
       <div class="field">
@@ -1014,7 +1110,10 @@
 
       <div class="field field-full">
         <label for="f-summary">文章摘要（显示在首页卡片上）</label>
-        <input id="f-summary" class="inp" type="text" placeholder="简单写一两句导语，吸引大家点进来～">
+        <div class="summary-row">
+          <input id="f-summary" class="inp" type="text" placeholder="简单写一两句导语，吸引大家点进来～">
+          <button id="auto-summary-btn" class="btn btn-soft btn-sm" type="button" style="white-space:nowrap" title="从正文自动提取前 90 字作为摘要">✨ 自动提取</button>
+        </div>
       </div>
 
       <!-- Cover Image Picker -->
@@ -1026,6 +1125,7 @@
           <div class="cover-ctrl">
             <div class="cover-btns">
               <button id="cover-upload-btn" class="btn btn-pink btn-sm" type="button">🖼️ 选择并裁剪封面</button>
+              <button id="cover-pick-media-btn" class="btn btn-soft btn-sm" type="button">🗂️ 媒体库选图</button>
               <button id="cover-recrop-btn" class="btn btn-soft btn-sm hidden" type="button">✂️ 重新裁剪</button>
               <button id="cover-clear-btn" class="btn btn-sm hidden" type="button">移除封面</button>
               <span id="cover-status" class="field-hint"></span>
@@ -1039,9 +1139,10 @@
 
     <!-- Markdown + Image/Video Editor -->
     <div class="field">
-      <label for="f-content">正文内容（Markdown 图文与视频 · 支持点击插图/插视频、直接拖入图片或视频、Ctrl+V 粘贴截图）</label>
+      <label for="f-content">正文内容（Markdown 图文与视频 · 支持点击插图/插视频、拖入媒体、选中文字直接粘贴网址变链接）</label>
       <div class="md-toolbar">
         <button id="tb-img" class="tb-btn tb-btn-img" type="button">🖼️ 插入图片</button>
+        <button id="tb-media-pick" class="tb-btn" type="button" title="从已上传媒体库挑选图片插入正文">🗂️ 媒体库</button>
         <button id="tb-vid" class="tb-btn tb-btn-vid" type="button">🎬 插入视频</button>
         <button class="tb-btn" data-md="h2" type="button">H2 标题</button>
         <button class="tb-btn" data-md="bold" type="button"><b>B</b> 粗体</button>
@@ -1416,6 +1517,18 @@
   </div>
 </div>
 
+<!-- Media Library Picker Modal (Cover / Inline Image Reuse) -->
+<div id="media-picker-modal" class="crop-modal hidden" role="dialog" aria-modal="true" aria-label="从媒体库选择图片">
+  <div class="mp-dialog">
+    <div class="crop-head">
+      <h3 id="mp-title">🗂️ 从媒体库挑选图片</h3>
+      <button id="mp-close-btn" class="btn btn-sm" type="button">✕</button>
+    </div>
+    <input id="mp-search" class="inp" type="search" placeholder="🔍 搜索已上传图片文件名...">
+    <div id="mp-grid" class="mp-grid"></div>
+  </div>
+</div>
+
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -1516,6 +1629,8 @@
     var dark = document.documentElement.getAttribute('data-theme') === 'dark';
     if (studioThemeBtn) studioThemeBtn.textContent = dark ? '☀ 日间' : '☾ 夜间';
     if (gateThemeBtn) gateThemeBtn.textContent = dark ? '☀' : '☾';
+    var tc = document.querySelector('meta[name="theme-color"]');
+    if (tc) tc.setAttribute('content', dark ? '#0b1224' : '#f6fbff');
   }
   function toggleStudioTheme() {
     var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -1526,6 +1641,16 @@
   if (studioThemeBtn) studioThemeBtn.addEventListener('click', toggleStudioTheme);
   if (gateThemeBtn) gateThemeBtn.addEventListener('click', toggleStudioTheme);
   syncStudioThemeUI();
+
+  var togglePassBtn = document.getElementById('toggle-pass-btn');
+  if (togglePassBtn && loginPass) {
+    togglePassBtn.addEventListener('click', function () {
+      var show = loginPass.type === 'password';
+      loginPass.type = show ? 'text' : 'password';
+      togglePassBtn.textContent = show ? '🙈' : '👁️';
+      loginPass.focus();
+    });
+  }
 
   /* Live Word Count & Reading Estimate */
   function updateWordCount() {
@@ -1665,6 +1790,7 @@
     }
     syncCoverUI();
     updateWordCount();
+    if (typeof renderTagSuggestions === 'function') renderTagSuggestions();
     if (state.previewOn) renderPreview();
     state.dirty = true;
     draftRestoreBar.classList.add('hidden');
@@ -1735,6 +1861,8 @@
   function showGate() {
     appView.classList.add('hidden');
     gateView.classList.remove('hidden');
+    if (loginPass) loginPass.type = 'password';
+    if (togglePassBtn) togglePassBtn.textContent = '👁️';
     loginPass.focus();
   }
 
@@ -1743,10 +1871,13 @@
     appView.classList.remove('hidden');
   }
 
-  /* Tabs */
+  /* Tabs (remembers last active tab across page refreshes) */
   var ALL_TABS = ['write', 'posts', 'moments', 'gallery', 'media', 'about', 'bgm', 'cats', 'settings'];
+  var TAB_STORE_KEY = 'asmblog-studio-tab';
   function switchTab(name) {
+    if (ALL_TABS.indexOf(name) === -1) name = 'write';
     state.activeTab = name;
+    try { sessionStorage.setItem(TAB_STORE_KEY, name); } catch (_) {}
     document.querySelectorAll('.tab-btn').forEach(function (b) {
       b.classList.toggle('is-active', b.getAttribute('data-tab') === name);
     });
@@ -1755,6 +1886,12 @@
       if (panel) panel.classList.toggle('hidden', t !== name);
     });
     if (name === 'media' && typeof loadMedia === 'function') loadMedia();
+  }
+  function restoreSavedTab() {
+    try {
+      var saved = sessionStorage.getItem(TAB_STORE_KEY);
+      if (saved && ALL_TABS.indexOf(saved) !== -1) switchTab(saved);
+    } catch (_) {}
   }
   document.querySelectorAll('.tab-btn').forEach(function (b) {
     b.addEventListener('click', function () { switchTab(b.getAttribute('data-tab')); });
@@ -2465,19 +2602,55 @@
   });
   fContent.addEventListener('paste', function (e) {
     var items = e.clipboardData && e.clipboardData.items;
-    if (!items) return;
     var media = [];
-    for (var i = 0; i < items.length; i++) {
-      var f = items[i].kind === 'file' ? items[i].getAsFile() : null;
-      if (f && ((f.type && f.type.indexOf('image/') === 0) || isVideoFile(f))) {
-        media.push(f);
+    if (items) {
+      for (var i = 0; i < items.length; i++) {
+        var f = items[i].kind === 'file' ? items[i].getAsFile() : null;
+        if (f && ((f.type && f.type.indexOf('image/') === 0) || isVideoFile(f))) {
+          media.push(f);
+        }
       }
     }
     if (media.length) {
       e.preventDefault();
       uploadInlineFiles(media);
+      return;
+    }
+    // Notion-style smart paste: pasting an http(s) URL while text is selected wraps as [text](url)!
+    var s = fContent.selectionStart || 0;
+    var en = fContent.selectionEnd || 0;
+    if (en > s && e.clipboardData && e.clipboardData.getData) {
+      var pasted = (e.clipboardData.getData('text/plain') || '').trim();
+      if (/^https?:\/\/\S+$/i.test(pasted)) {
+        var sel = fContent.value.slice(s, en);
+        if (sel.indexOf('\n') === -1 && sel.indexOf('](') === -1) {
+          e.preventDefault();
+          insertAtCursor('[', '](' + pasted + ')');
+          showToast('已自动将选中文字转为链接 🔗');
+        }
+      }
     }
   });
+
+  /* Auto-Extract Clean Excerpt from Markdown Content */
+  var autoSummaryBtn = document.getElementById('auto-summary-btn');
+  if (autoSummaryBtn) {
+    autoSummaryBtn.addEventListener('click', function () {
+      var raw = (fContent.value || '')
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/^>\s?/gm, '')
+        .replace(/[`*_~]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!raw) { showToast('正文还是空的哦，先写一点内容吧～', true); return; }
+      fSummary.value = raw.length > 90 ? (raw.slice(0, 90).trim() + '…') : raw;
+      markDirty();
+      showToast('已从正文自动提取摘要 ✦');
+    });
+  }
 
   /* Markdown Editor Keyboard Shortcuts (Ctrl+B / Ctrl+I / Ctrl+K / Tab) */
   fContent.addEventListener('keydown', function (e) {
@@ -2627,6 +2800,7 @@
     saveBtn.textContent = '✦ 发布文章';
     syncCoverUI();
     updateWordCount();
+    if (typeof renderTagSuggestions === 'function') renderTagSuggestions();
     if (state.previewOn) renderPreview();
   }
   document.getElementById('new-post-btn').addEventListener('click', function () {
@@ -2656,12 +2830,19 @@
       return;
     }
     saveBtn.disabled = true;
+    var normTags = (fTags.value || '')
+      .split(/[,，、]/)
+      .map(function (t) { return t.trim(); })
+      .filter(Boolean)
+      .filter(function (t, i, arr) { return arr.indexOf(t) === i; })
+      .join(', ');
+    fTags.value = normTags;
     var payload = {
       title: title,
       slug: slug,
       date: fDate.value.trim() || todayStr(),
       category: fCat.value.trim(),
-      tags: fTags.value.trim(),
+      tags: normTags,
       summary: fSummary.value.trim(),
       cover: fCover.value.trim(),
       draft: fDraft.checked ? 'true' : 'false',
@@ -2790,6 +2971,7 @@
       var pinBadge = p.pinned ? '<span class="badge badge-pink">📌 置顶</span>' : '';
       var draftBadge = p.draft ? '<span class="badge badge-draft">草稿</span>' : '<span class="badge">已发布</span>';
       var toggleLabel = p.draft ? '立即发布' : '转草稿';
+      var pinToggleLabel = p.pinned ? '取消置顶' : '📌 置顶';
       var viewBtn = p.draft
         ? '<a class="btn btn-soft btn-sm" href="/post/' + esc(p.slug) + '/" target="_blank" title="以已登录博主身份预览真实前台效果">👁️ 预览</a>'
         : '<a class="btn btn-sm" href="/post/' + esc(p.slug) + '/" target="_blank">查看</a>';
@@ -2807,6 +2989,7 @@
           '</div>' +
           '<div class="post-row-ops">' +
             '<button class="btn btn-soft btn-sm" type="button" data-edit-post="' + esc(p.slug) + '">编辑</button>' +
+            '<button class="btn btn-sm" type="button" data-toggle-pin="' + esc(p.slug) + '">' + pinToggleLabel + '</button>' +
             '<button class="btn btn-sm" type="button" data-toggle-draft="' + esc(p.slug) + '">' + toggleLabel + '</button>' +
             viewBtn +
             '<button class="btn btn-danger btn-sm" type="button" data-del-post="' + esc(p.slug) + '" data-post-title="' + esc(p.title) + '">删除</button>' +
@@ -2856,6 +3039,7 @@
           fCat.value = p.category || '';
           syncCoverUI();
           updateWordCount();
+          if (typeof renderTagSuggestions === 'function') renderTagSuggestions();
           setSaveStatus('', false);
           editorModeLabel.textContent = '✏️ 编辑文章';
           editorSlugBadge.textContent = p.slug;
@@ -2866,6 +3050,38 @@
           window.scrollTo({ top: 0, behavior: 'smooth' });
         })
         .catch(function (err) { showToast(esc(err.message), true); });
+      return;
+    }
+
+    var pinBtn = e.target.closest('[data-toggle-pin]');
+    if (pinBtn) {
+      var pSlug = pinBtn.getAttribute('data-toggle-pin');
+      pinBtn.disabled = true;
+      api('GET', '/api/studio/posts/' + encodeURIComponent(pSlug))
+        .then(function (p) {
+          var nextPin = !p.pinned;
+          return api('POST', '/api/studio/posts', {
+            title: p.title || '',
+            slug: p.slug,
+            date: p.date || todayStr(),
+            category: p.category || '',
+            tags: p.tags || '',
+            summary: p.summary || '',
+            cover: p.cover || '',
+            draft: p.draft ? 'true' : 'false',
+            pinned: nextPin ? 'true' : 'false',
+            content: p.content || ''
+          }).then(function () { return nextPin; });
+        })
+        .then(function (nextPin) {
+          if (state.editingSlug === pSlug && fPinned) fPinned.checked = nextPin;
+          showToast(nextPin ? '文章已置顶到首页最前 📌' : '已取消文章置顶 ✦');
+          return refreshAll();
+        })
+        .catch(function (err) {
+          pinBtn.disabled = false;
+          showToast(esc(err.message), true);
+        });
       return;
     }
 
@@ -4125,6 +4341,113 @@
     });
   }
 
+  /* =========================================================
+     Tag Suggestions Chips & Visual Media Library Picker Modal
+     ========================================================= */
+  var tagSuggestBox = document.getElementById('tag-suggest-chips');
+  function parseTagList(str) {
+    return String(str || '').split(/[,，、]/).map(function (t) { return t.trim(); }).filter(Boolean);
+  }
+  function renderTagSuggestions() {
+    if (!tagSuggestBox) return;
+    var freq = {};
+    (state.posts || []).forEach(function (p) {
+      parseTagList(p && p.tags).forEach(function (t) { freq[t] = (freq[t] || 0) + 1; });
+    });
+    var top = Object.keys(freq).sort(function (a, b) { return freq[b] - freq[a]; }).slice(0, 12);
+    if (!top.length) { tagSuggestBox.innerHTML = ''; return; }
+    var active = parseTagList(fTags.value);
+    tagSuggestBox.innerHTML = top.map(function (t) {
+      var picked = active.indexOf(t) !== -1;
+      return '<button type="button" class="tag-sug-chip' + (picked ? ' is-picked' : '') + '" data-sug-tag="' + esc(t) + '">#' + esc(t) + '</button>';
+    }).join('');
+  }
+  if (tagSuggestBox) {
+    tagSuggestBox.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-sug-tag]');
+      if (!btn) return;
+      var tag = btn.getAttribute('data-sug-tag') || '';
+      var list = parseTagList(fTags.value);
+      var idx = list.indexOf(tag);
+      if (idx === -1) list.push(tag);
+      else list.splice(idx, 1);
+      fTags.value = list.join(', ');
+      markDirty();
+      renderTagSuggestions();
+    });
+  }
+  if (fTags) fTags.addEventListener('input', renderTagSuggestions);
+
+  var mpModal = document.getElementById('media-picker-modal');
+  var mpTitle = document.getElementById('mp-title');
+  var mpSearch = document.getElementById('mp-search');
+  var mpGrid = document.getElementById('mp-grid');
+  var mpCloseBtn = document.getElementById('mp-close-btn');
+  var mpMode = 'inline';
+
+  function renderMediaPicker() {
+    if (!mpGrid) return;
+    var q = mpSearch ? mpSearch.value.trim().toLowerCase() : '';
+    var imgs = (state.media || [])
+      .filter(function (m) { return m && !m.part && isImgName(m.name); })
+      .sort(function (a, b) { return (b.mtime || 0) - (a.mtime || 0); })
+      .filter(function (m) { return !q || (m.name || '').toLowerCase().indexOf(q) !== -1; });
+    if (!imgs.length) {
+      mpGrid.innerHTML = '<p class="field-hint" style="grid-column:1/-1;text-align:center;padding:24px 0">媒体库里暂无匹配的图片～</p>';
+      return;
+    }
+    mpGrid.innerHTML = imgs.map(function (m) {
+      return (
+        '<button type="button" class="mp-item" data-mp-url="' + esc(m.url) + '" title="' + esc(m.name) + '">' +
+          '<img src="' + esc(m.url) + '" alt="" loading="lazy">' +
+          '<span>' + esc(m.name) + '</span>' +
+        '</button>'
+      );
+    }).join('');
+  }
+  function openMediaPicker(mode) {
+    mpMode = mode || 'inline';
+    if (mpTitle) mpTitle.textContent = mpMode === 'cover' ? '🗂️ 从媒体库选择文章封面' : '🗂️ 从媒体库插入图片到正文';
+    if (mpSearch) mpSearch.value = '';
+    if (mpModal) mpModal.classList.remove('hidden');
+    if (state.media && state.media.length) renderMediaPicker();
+    else if (mpGrid) mpGrid.innerHTML = '<p class="field-hint" style="grid-column:1/-1;text-align:center;padding:24px 0">正在扫描媒体库…</p>';
+    loadMedia().then(renderMediaPicker);
+    if (mpSearch) mpSearch.focus();
+  }
+  function closeMediaPicker() {
+    if (mpModal) mpModal.classList.add('hidden');
+  }
+  var coverPickMediaBtn = document.getElementById('cover-pick-media-btn');
+  var tbMediaPick = document.getElementById('tb-media-pick');
+  if (coverPickMediaBtn) coverPickMediaBtn.addEventListener('click', function () { openMediaPicker('cover'); });
+  if (tbMediaPick) tbMediaPick.addEventListener('click', function () { openMediaPicker('inline'); });
+  if (mpCloseBtn) mpCloseBtn.addEventListener('click', closeMediaPicker);
+  if (mpModal) mpModal.addEventListener('click', function (e) { if (e.target === mpModal) closeMediaPicker(); });
+  if (mpSearch) mpSearch.addEventListener('input', renderMediaPicker);
+  if (mpGrid) mpGrid.addEventListener('click', function (e) {
+    var item = e.target.closest('[data-mp-url]');
+    if (!item) return;
+    var rawUrl = item.getAttribute('data-mp-url') || '';
+    var fullUrl = findPairedGalleryUrl(rawUrl);
+    if (mpMode === 'cover') {
+      fCover.value = fullUrl;
+      syncCoverUI();
+      markDirty();
+      showToast('已从媒体库选定文章封面 ✦');
+    } else {
+      insertAtCursor('\n![](' + fullUrl + ')\n', '');
+      showToast('已从媒体库插入图片到正文 ✦');
+    }
+    closeMediaPicker();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && mpModal && !mpModal.classList.contains('hidden')) {
+      e.preventDefault();
+      closeMediaPicker();
+    }
+  });
+
   function refreshAll() {
     return Promise.all([
       api('GET', '/api/studio/posts'),
@@ -4160,6 +4483,7 @@
       setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, false);
       setBtnDirty(saveBgmBtn, SAVE_BGM_LABEL, false);
       renderPosts();
+      renderTagSuggestions();
       renderCats();
       renderMomentsAdmin();
       renderGalleryAdmin();
@@ -4188,6 +4512,7 @@
         showApp();
         resetEditor();
         checkDraftRecovery();
+        restoreSavedTab();
         return refreshAll();
       });
     }).catch(function (err) {
@@ -4210,6 +4535,7 @@
       showApp();
       resetEditor();
       checkDraftRecovery();
+      restoreSavedTab();
     })
     .catch(function () {
       showGate();

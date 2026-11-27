@@ -35,6 +35,7 @@
   }
 
   function showToast(msg) {
+    if (typeof hideResumePill === 'function') hideResumePill();
     if (!toastEl) {
       toastEl = document.createElement('div');
       toastEl.id = 'sky-toast';
@@ -252,9 +253,15 @@
     } catch (_) {}
   }
 
+  function syncThemeColor(mode) {
+    var tc = document.querySelector('meta[name="theme-color"]');
+    if (tc) tc.setAttribute('content', mode === 'dark' ? '#0b1224' : '#f2f8ff');
+  }
+
   function applyTheme(next) {
     root.setAttribute('data-theme', next);
     store('asmblog-theme', next);
+    syncThemeColor(next);
     syncGiscusTheme(next);
   }
 
@@ -1280,6 +1287,14 @@
 
       var html = '';
       if (!q) {
+        html +=
+          '<div class="cmd-section-label">✦ 快捷直达</div>' +
+          '<div class="cmd-quick-row">' +
+          '<button type="button" class="cmd-quick-btn" data-cmd-nav="/moments/">💬 碎碎念</button>' +
+          '<button type="button" class="cmd-quick-btn" data-cmd-nav="/gallery/">🖼️ 精选画廊</button>' +
+          '<button type="button" class="cmd-quick-btn" data-cmd-nav="/about/">🎀 关于与友链</button>' +
+          '<button type="button" class="cmd-quick-btn" data-cmd-nav="/archive/">📅 时间归档</button>' +
+          '</div>';
         var top = topSearchKeywords(list, 8);
         if (top.length) {
           html += '<div class="cmd-section-label">✦ 热门标签快捷搜</div><div class="cmd-chips">' +
@@ -1308,6 +1323,13 @@
       }
 
       cmdBody.innerHTML = html;
+      cmdBody.querySelectorAll('[data-cmd-nav]').forEach(function (navBtn) {
+        navBtn.addEventListener('click', function () {
+          var dest = navBtn.getAttribute('data-cmd-nav') || '/';
+          closeCmdSearch();
+          smoothNavigate(new URL(dest, window.location.origin), true);
+        });
+      });
       cmdBody.querySelectorAll('[data-cmd-q]').forEach(function (chip) {
         chip.addEventListener('click', function () {
           var kw = chip.getAttribute('data-cmd-q') || '';
@@ -1986,6 +2008,37 @@
     }
   }
 
+  /* Warm Human-Friendly Relative Time (keeps exact timestamp in title attribute) */
+  function formatRelativeTime(dateStr) {
+    var raw = String(dateStr || '').trim();
+    if (!raw) return '';
+    var m = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+    if (!m) return raw;
+    var hasTime = !!(m[4] && m[5]);
+    var dt = new Date(
+      parseInt(m[1], 10),
+      parseInt(m[2], 10) - 1,
+      parseInt(m[3], 10),
+      hasTime ? parseInt(m[4], 10) : 12,
+      hasTime ? parseInt(m[5], 10) : 0
+    );
+    if (isNaN(dt.getTime())) return raw;
+    var diffSec = Math.floor((Date.now() - dt.getTime()) / 1000);
+    if (diffSec < 0) return raw;
+    if (hasTime) {
+      if (diffSec < 60) return '刚刚';
+      if (diffSec < 3600) return Math.floor(diffSec / 60) + ' 分钟前';
+      if (diffSec < 86400) return Math.floor(diffSec / 3600) + ' 小时前';
+    }
+    var today0 = new Date(); today0.setHours(0, 0, 0, 0);
+    var target0 = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    var dayDiff = Math.round((today0.getTime() - target0.getTime()) / 86400000);
+    if (dayDiff === 0) return hasTime ? ('今天 ' + m[4] + ':' + m[5]) : '今天';
+    if (dayDiff === 1) return hasTime ? ('昨天 ' + m[4] + ':' + m[5]) : '昨天';
+    if (dayDiff > 1 && dayDiff <= 7) return dayDiff + ' 天前';
+    return raw;
+  }
+
   /* Moments / 碎碎念 Timeline (/moments/) */
   function formatMomentText(raw) {
     var s = String(raw || '');
@@ -2098,7 +2151,7 @@
                       '<span class="moment-author">' + esc(author) + '</span>' +
                       pinHtml + moodHtml +
                     '</div>' +
-                    '<div class="moment-time">' + esc(m.date || '') + '</div>' +
+                    '<div class="moment-time" title="' + esc(m.date || '') + '">' + esc(formatRelativeTime(m.date || '')) + '</div>' +
                   '</div>' +
                 '</div>' +
                 txtHtml + photosHtml +
@@ -2149,6 +2202,197 @@
       });
   }
 
+  /* Homepage Latest Moment Ticker & Lightweight Card View/Like Badges */
+  function initHomeEnhancements() {
+    var momBar = document.getElementById('home-moment-bar');
+    if (momBar && !momBar.dataset.momBarInit) {
+      momBar.dataset.momBarInit = '1';
+      fetch('/moments.json')
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (data) {
+          var list = (Array.isArray(data) ? data : []).filter(function (m) {
+            if (!m || typeof m !== 'object') return false;
+            var imgs = Array.isArray(m.images) ? m.images.filter(isSafeFrontUrl) : [];
+            return String(m.text || '').trim().length > 0 || imgs.length > 0;
+          });
+          if (!list.length) return;
+          var top = list.find(function (m) { return !!m.pinned; }) || list[0];
+          var txt = String(top.text || '').replace(/\s+/g, ' ').trim();
+          var imgsCnt = Array.isArray(top.images) ? top.images.filter(isSafeFrontUrl).length : 0;
+          if (!txt && imgsCnt) txt = '分享了 ' + imgsCnt + ' 张图片';
+          else if (imgsCnt) txt = txt + ' [' + imgsCnt + ' 图]';
+          var rel = formatRelativeTime(top.date || '');
+          momBar.innerHTML =
+            '<a class="home-moment-link" href="/moments/">' +
+              '<span class="home-moment-badge">💬 ' + esc(top.mood || '最新碎碎念') + '</span>' +
+              '<span class="home-moment-text">' + esc(txt) + '</span>' +
+              (rel ? '<span class="home-moment-time" title="' + esc(top.date || '') + '">' + esc(rel) + '</span>' : '') +
+              '<span class="home-moment-go">全部动态 →</span>' +
+            '</a>';
+          momBar.classList.remove('hidden');
+          recalcMetrics();
+        })
+        .catch(function () {});
+    }
+
+    var statSlots = Array.prototype.slice.call(document.querySelectorAll('[data-card-stats]'));
+    if (statSlots.some(function (el) { return !el.dataset.statsDone; })) {
+      fetch('/api/stats', { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data || !Array.isArray(data.items)) return;
+          var bySlug = {};
+          data.items.forEach(function (it) { if (it && it.slug) bySlug[it.slug] = it; });
+          document.querySelectorAll('[data-card-stats]').forEach(function (el) {
+            el.dataset.statsDone = '1';
+            var sl = el.getAttribute('data-card-stats') || '';
+            var st = bySlug[sl];
+            if (!st || (!st.views && !st.likes)) return;
+            var parts = [];
+            if (st.views) parts.push('👁 ' + st.views);
+            if (st.likes) parts.push('♥ ' + st.likes);
+            el.innerHTML = '<span class="meta-dot">✦</span> ' + parts.join(' · ');
+            el.classList.remove('hidden');
+          });
+        })
+        .catch(function () {});
+    }
+  }
+
+  /* Related Posts Recommendation (based on shared category & tags via cached search-index) */
+  function initRelatedPosts() {
+    var box = document.getElementById('related-posts');
+    var art = document.querySelector('article[data-post-slug]');
+    if (!box || !art || box.dataset.relInit) return;
+    box.dataset.relInit = '1';
+    var curSlug = (art.getAttribute('data-post-slug') || '').trim();
+    var curCat = (art.getAttribute('data-post-cat') || '').trim().toLowerCase();
+    var curTags = Array.prototype.slice.call(art.querySelectorAll('.tag-row .tag-chip'))
+      .map(function (el) { return (el.textContent || '').replace(/^#/, '').trim().toLowerCase(); })
+      .filter(Boolean);
+
+    getSearchIndex(function (list) {
+      var others = (Array.isArray(list) ? list : []).filter(function (p) {
+        return p && p.slug && p.slug !== curSlug;
+      });
+      if (!others.length) return;
+      var scored = others.map(function (p, idx) {
+        var score = 0;
+        if (curCat && (p.category || '').trim().toLowerCase() === curCat) score += 3;
+        var pTags = (p.tags || '').split(',').map(function (t) { return t.trim().toLowerCase(); }).filter(Boolean);
+        pTags.forEach(function (t) { if (curTags.indexOf(t) !== -1) score += 2; });
+        return { post: p, score: score, idx: idx };
+      });
+      scored.sort(function (a, b) { return (b.score - a.score) || (a.idx - b.idx); });
+      var picked = scored.filter(function (x) { return x.score > 0; }).slice(0, 3).map(function (x) { return x.post; });
+      if (!picked.length) picked = others.slice(0, Math.min(3, others.length));
+      if (!picked.length) return;
+
+      box.innerHTML =
+        '<div class="related-head"><h2 class="related-heading">✨ 猜你也喜欢</h2></div>' +
+        '<div class="related-grid">' + picked.map(function (p) {
+          var thumb = (p.cover && isSafeFrontUrl(p.cover))
+            ? '<img class="related-thumb" src="' + esc(p.cover) + '" alt="' + esc(p.title) + '" loading="lazy" decoding="async">'
+            : '';
+          var meta = [p.category ? ('✦ ' + p.category) : '', p.date || ''].filter(Boolean).join(' · ');
+          return (
+            '<a class="related-item" href="/post/' + esc(p.slug) + '/">' +
+              thumb +
+              '<div class="related-body">' +
+                '<p class="related-title">' + esc(p.title) + '</p>' +
+                '<span class="related-meta">' + esc(meta) + '</span>' +
+              '</div>' +
+            '</a>'
+          );
+        }).join('') + '</div>';
+      box.classList.remove('hidden');
+      recalcMetrics();
+    });
+  }
+
+  /* Gentle Resume-Reading Memory for Long Articles (non-intrusive clickable pill) */
+  var READPOS_KEY = 'asmblog-readpos-v1';
+  var resumePillEl = null;
+  var resumeHideTimer = null;
+  var resumeSaveTimer = null;
+  var activeResumeSlug = '';
+
+  function readPosMap() {
+    try {
+      var obj = JSON.parse(localStorage.getItem(READPOS_KEY) || '{}');
+      return (obj && typeof obj === 'object') ? obj : {};
+    } catch (_) { return {}; }
+  }
+  function saveReadPosNow(slug) {
+    if (!slug) return;
+    var maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    if (maxScroll < window.innerHeight * 1.15) return;
+    var pct = Math.round(((window.scrollY || 0) / maxScroll) * 100);
+    var map = readPosMap();
+    if (pct >= 15 && pct <= 88) {
+      map[slug] = { pct: pct, y: Math.round(window.scrollY || 0), ts: Date.now() };
+      var keys = Object.keys(map);
+      if (keys.length > 20) {
+        keys.sort(function (a, b) { return ((map[a] && map[a].ts) || 0) - ((map[b] && map[b].ts) || 0); });
+        keys.slice(0, keys.length - 20).forEach(function (k) { delete map[k]; });
+      }
+    } else if (pct > 90 && map[slug]) {
+      delete map[slug];
+    }
+    try { localStorage.setItem(READPOS_KEY, JSON.stringify(map)); } catch (_) {}
+  }
+  function hideResumePill() {
+    clearTimeout(resumeHideTimer);
+    if (resumePillEl) resumePillEl.classList.remove('is-shown');
+  }
+  function showResumePill(pct, targetY) {
+    if (!resumePillEl) {
+      resumePillEl = document.createElement('div');
+      resumePillEl.id = 'resume-pill';
+      resumePillEl.className = 'resume-pill';
+      resumePillEl.setAttribute('role', 'status');
+      document.body.appendChild(resumePillEl);
+    }
+    resumePillEl.innerHTML =
+      '<span>🔖 上次读到 ' + pct + '%</span>' +
+      '<button type="button" class="resume-pill-go">继续阅读</button>' +
+      '<button type="button" class="resume-pill-x" aria-label="关闭">✕</button>';
+    resumePillEl.querySelector('.resume-pill-go').addEventListener('click', function () {
+      hideResumePill();
+      var maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      window.scrollTo({ top: Math.min(targetY, maxY), behavior: reducedMotion ? 'auto' : 'smooth' });
+    });
+    resumePillEl.querySelector('.resume-pill-x').addEventListener('click', hideResumePill);
+    resumePillEl.classList.add('is-shown');
+    clearTimeout(resumeHideTimer);
+    resumeHideTimer = setTimeout(hideResumePill, 6500);
+  }
+  function initReadingResume() {
+    hideResumePill();
+    var art = document.querySelector('article[data-post-slug]');
+    activeResumeSlug = art ? (art.getAttribute('data-post-slug') || '').trim() : '';
+    if (!activeResumeSlug) return;
+    if (art.querySelector('.draft-preview-banner')) { activeResumeSlug = ''; return; }
+    var rec = readPosMap()[activeResumeSlug];
+    if (rec && rec.pct >= 15 && rec.pct <= 88 && rec.y > 240 && (window.scrollY || 0) < 120) {
+      setTimeout(function () {
+        if (activeResumeSlug && (window.scrollY || 0) < 120) showResumePill(rec.pct, rec.y);
+      }, 450);
+    }
+  }
+  window.addEventListener('scroll', function () {
+    if (!activeResumeSlug) return;
+    if ((window.scrollY || 0) > 180) hideResumePill();
+    clearTimeout(resumeSaveTimer);
+    var sl = activeResumeSlug;
+    resumeSaveTimer = setTimeout(function () {
+      if (activeResumeSlug === sl) saveReadPosNow(sl);
+    }, 900);
+  }, { passive: true });
+  window.addEventListener('pagehide', function () {
+    if (activeResumeSlug) saveReadPosNow(activeResumeSlug);
+  });
+
   function hydratePage(animate) {
     if (animate) animateStageCards();
     enhanceImages();
@@ -2156,6 +2400,9 @@
     enhanceCodeBlocks();
     initArticleExtras();
     initArticleStats();
+    initRelatedPosts();
+    initReadingResume();
+    initHomeEnhancements();
     initArchiveYears();
     initComments();
     initGallery();
@@ -2272,6 +2519,8 @@
     }
 
     saveCurrentScroll(!!push);
+    if (activeResumeSlug) saveReadPosNow(activeResumeSlug);
+    hideResumePill();
     isNavigating = true;
     updateNavState(urlObj.pathname);
     startLoader();
@@ -2399,14 +2648,29 @@
       return;
     }
     var tag = document.activeElement ? document.activeElement.tagName : '';
-    if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA' && !(document.activeElement && document.activeElement.isContentEditable)) {
-      var inp = document.getElementById('search-input');
-      if (inp) {
-        e.preventDefault();
-        inp.focus();
-      } else {
-        e.preventDefault();
-        openCmdSearch();
+    var typing = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
+    if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === '/') {
+        var inp = document.getElementById('search-input');
+        if (inp) {
+          e.preventDefault();
+          inp.focus();
+        } else {
+          e.preventDefault();
+          openCmdSearch();
+        }
+      } else if (e.key === '[') {
+        var prevA = document.querySelector('.post-nav .post-nav-slot:first-child a');
+        if (prevA && isInternalPageLink(prevA)) {
+          e.preventDefault();
+          smoothNavigate(new URL(prevA.href, window.location.origin), true);
+        }
+      } else if (e.key === ']') {
+        var nextA = document.querySelector('.post-nav .post-nav-slot:last-child a');
+        if (nextA && isInternalPageLink(nextA)) {
+          e.preventDefault();
+          smoothNavigate(new URL(nextA.href, window.location.origin), true);
+        }
       }
     }
   });

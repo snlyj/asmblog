@@ -257,6 +257,7 @@ def test_server():
             "/static/notfound.jpg",
             "/static/notfound.webp",
             "/static/favicon-ribbon.svg",
+            "/static/manifest.json",
             "/favicon.ico",
         ]
         for r in routes:
@@ -331,19 +332,22 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v18 = http_req("/static/sky-ribbon.css?v=18")
+        st_imm, hdrs_imm, css_v19 = http_req("/static/sky-ribbon.css?v=19")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v18)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v19)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
-        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b"visibility: hidden", b".draft-preview-banner", b".like-btn", b".moments-feed", b".moment-card", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
+        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b"visibility: hidden", b".draft-preview-banner", b".like-btn", b".moments-feed", b".moment-card", b".home-moment-bar", b".related-card", b".resume-pill", b".cmd-quick-row", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
             assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v18 = http_req("/static/sky-ribbon.js?v=18")
+        st_js, _, js_v19 = http_req("/static/sky-ribbon.js?v=19")
         assert_eq(st_js, 200, "versioned static js 200")
-        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"initGallery", b"initAbout", b"initMoments", b"initArticleStats", b"formatMomentText", b"initBgmPlayer", b"pauseBgm", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart"):
-            assert required_js in js_v18, f"missing expected UI JS feature: {required_js!r}"
+        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"initGallery", b"initAbout", b"initMoments", b"initArticleStats", b"initRelatedPosts", b"initReadingResume", b"initHomeEnhancements", b"formatRelativeTime", b"formatMomentText", b"syncThemeColor", b"initBgmPlayer", b"pauseBgm", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart"):
+            assert required_js in js_v19, f"missing expected UI JS feature: {required_js!r}"
+        st_mf, h_mf, b_mf = http_req("/static/manifest.json")
+        assert_eq(st_mf, 200, "GET /static/manifest.json")
+        assert "application/json" in h_mf.get("Content-Type", "") and json.loads(b_mf)["display"] == "standalone"
 
         _, _, sm_xml = http_req("/sitemap.xml")
         sm_txt = sm_xml.decode("utf-8")
@@ -489,7 +493,7 @@ def test_server():
         st_txt = st_page.decode("utf-8")
         assert "作者秘密写作室" in st_txt
         assert "crop-modal" in st_txt and "crop-stage" in st_txt and "tab-settings" in st_txt, "studio UI features missing"
-        for required_st in ("draft-restore-bar", "upload-progress-wrap", "posts-filter-bar", "posts-stats-badge", "posts-sort", "studio-theme-btn", "word-count-badge", "data-toggle-draft", "f-pinned", "tab-moments", "mom-compose-box", "tab-gallery", "tab-media", "tab-about", "tab-bgm", "media-clean-btn", "backup-download-btn"):
+        for required_st in ("draft-restore-bar", "upload-progress-wrap", "posts-filter-bar", "posts-stats-badge", "posts-sort", "studio-theme-btn", "word-count-badge", "data-toggle-draft", "data-toggle-pin", "f-pinned", "tab-moments", "mom-compose-box", "tab-gallery", "tab-media", "tab-about", "tab-bgm", "media-clean-btn", "backup-download-btn", "media-picker-modal", "auto-summary-btn", "tag-suggest-chips", "toggle-pass-btn"):
             assert required_st in st_txt, f"missing Studio UX feature: {required_st}"
 
         # Must block unauthenticated Studio API requests (including forged raw SHA256 hash cookie!)

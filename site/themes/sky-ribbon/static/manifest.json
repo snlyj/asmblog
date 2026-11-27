@@ -1,0 +1,16 @@
+{
+  "name": "晴空星梦小站 · AsmBlog",
+  "short_name": "晴空小站",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f8ff",
+  "theme_color": "#f2f8ff",
+  "icons": [
+    {
+      "src": "/static/favicon-ribbon.svg?v=2",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

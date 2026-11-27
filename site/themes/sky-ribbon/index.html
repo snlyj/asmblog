@@ -29,6 +29,7 @@
 </section>
 
 <div class="feed-wrap feed-wide">
+  <div id="home-moment-bar" class="home-moment-bar hidden" aria-label="最新碎碎念"></div>
   <nav class="cat-bar reveal" aria-label="文章分类">
     <a class="cat-pill is-active" href="/">✦ 全部</a>
     {{#categories}}
@@ -52,6 +53,7 @@
           <time>{{ date }}</time>
           <span class="meta-dot">✦</span>
           <span>约 {{ read_min }} 分钟阅读</span>
+          <span class="card-stats hidden" data-card-stats="{{ slug }}"></span>
         </div>
         <h2 class="post-card-title">
           <a href="/post/{{ slug }}/">{{ title }}</a>
