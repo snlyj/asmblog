@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import concurrent.futures
 import hashlib
+import io
 import json
 import os
 import re
@@ -9,6 +10,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import urllib.error
@@ -150,16 +152,18 @@ def test_site_ssg_build():
         sidx = json.loads(open(os.path.join(dist_tmp, "search-index.json"), encoding="utf-8").read())
         assert_eq(len(sidx), 3, "search-index count")
 
-        # Valid XML for RSS and Sitemap + SSG gallery/about/bgm outputs
+        # Valid XML for RSS and Sitemap + SSG gallery/about/moments/bgm outputs
         rss = ET.fromstring(open(os.path.join(dist_tmp, "rss.xml"), encoding="utf-8").read())
         assert len(rss.findall(".//item")) == 3
         sm = ET.fromstring(open(os.path.join(dist_tmp, "sitemap.xml"), encoding="utf-8").read())
-        assert len(list(sm)) == 6  # home + gallery + about + 3 posts
+        assert len(list(sm)) == 7  # home + gallery + about + moments + 3 posts
         assert "精选画廊" in open(os.path.join(dist_tmp, "gallery/index.html"), encoding="utf-8").read()
         assert "friends-grid" in open(os.path.join(dist_tmp, "about/index.html"), encoding="utf-8").read()
+        assert "moments-feed" in open(os.path.join(dist_tmp, "moments/index.html"), encoding="utf-8").read()
         assert isinstance(json.loads(open(os.path.join(dist_tmp, "gallery.json"), encoding="utf-8").read()), list)
         assert isinstance(json.loads(open(os.path.join(dist_tmp, "about.json"), encoding="utf-8").read()), dict)
         assert isinstance(json.loads(open(os.path.join(dist_tmp, "bgm.json"), encoding="utf-8").read()), list)
+        assert isinstance(json.loads(open(os.path.join(dist_tmp, "moments.json"), encoding="utf-8").read()), list)
 
         # Copied static assets
         assert os.path.getsize(os.path.join(dist_tmp, "static/sky-ribbon.css")) > 500
@@ -228,9 +232,13 @@ def test_server():
             "/gallery/",
             "/about",
             "/about/",
+            "/moments",
+            "/moments/",
             "/gallery.json",
             "/about.json",
             "/bgm.json",
+            "/moments.json",
+            "/api/stats",
             "/search-index.json",
             "/rss.xml",
             "/sitemap.xml",
@@ -318,23 +326,23 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v16 = http_req("/static/sky-ribbon.css?v=16")
+        st_imm, hdrs_imm, css_v17 = http_req("/static/sky-ribbon.css?v=17")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v16)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v17)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
-        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b"visibility: hidden", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
+        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b"visibility: hidden", b".draft-preview-banner", b".like-btn", b".moments-feed", b".moment-card", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
             assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v16 = http_req("/static/sky-ribbon.js?v=16")
+        st_js, _, js_v17 = http_req("/static/sky-ribbon.js?v=17")
         assert_eq(st_js, 200, "versioned static js 200")
-        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"initGallery", b"initAbout", b"initBgmPlayer", b"pauseBgm", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart"):
-            assert required_js in js_v16, f"missing expected UI JS feature: {required_js!r}"
+        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"initGallery", b"initAbout", b"initMoments", b"initArticleStats", b"formatMomentText", b"initBgmPlayer", b"pauseBgm", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart"):
+            assert required_js in js_v17, f"missing expected UI JS feature: {required_js!r}"
 
         _, _, sm_xml = http_req("/sitemap.xml")
         sm_txt = sm_xml.decode("utf-8")
-        assert "/gallery/</loc>" in sm_txt and "/about/</loc>" in sm_txt, "sitemap must include /gallery/ and /about/"
+        assert "/gallery/</loc>" in sm_txt and "/about/</loc>" in sm_txt and "/moments/</loc>" in sm_txt, "sitemap must include /gallery/, /about/ and /moments/"
 
         # Open Graph / Twitter Card social preview meta + zero-bloat Giscus hidden by default
         assert 'property="og:type" content="website"' in home_txt
@@ -476,7 +484,7 @@ def test_server():
         st_txt = st_page.decode("utf-8")
         assert "作者秘密写作室" in st_txt
         assert "crop-modal" in st_txt and "crop-stage" in st_txt and "tab-settings" in st_txt, "studio UI features missing"
-        for required_st in ("draft-restore-bar", "upload-progress-wrap", "posts-filter-bar", "studio-theme-btn", "word-count-badge", "data-toggle-draft", "f-pinned", "tab-gallery", "tab-media", "tab-about", "tab-bgm", "media-clean-btn"):
+        for required_st in ("draft-restore-bar", "upload-progress-wrap", "posts-filter-bar", "posts-stats-badge", "posts-sort", "studio-theme-btn", "word-count-badge", "data-toggle-draft", "f-pinned", "tab-moments", "mom-compose-box", "tab-gallery", "tab-media", "tab-about", "tab-bgm", "media-clean-btn", "backup-download-btn"):
             assert required_st in st_txt, f"missing Studio UX feature: {required_st}"
 
         # Must block unauthenticated Studio API requests (including forged raw SHA256 hash cookie!)
@@ -493,8 +501,10 @@ def test_server():
             ("POST", "/api/studio/gallery"),
             ("POST", "/api/studio/about"),
             ("POST", "/api/studio/bgm"),
+            ("POST", "/api/studio/moments"),
             ("GET", "/api/studio/media"),
             ("POST", "/api/studio/media/delete"),
+            ("GET", "/api/studio/backup"),
             ("DELETE", "/api/studio/posts/welcome-to-asmblog"),
         ]:
             st_u, _, _ = http_req(u, method=m, headers=forged_hdr, data=(b"{}" if m == "POST" else None))
@@ -702,17 +712,20 @@ def test_server():
         assert_eq(gp_obj["pinned"], True, "pinned flag round-trip")
         assert f"![可爱插图]({up_url})" in gp_obj["content"]
 
-        # Curated Gallery, About/Friends, Audio BGM Upload + Media Library Reference & Cleanup E2E
+        # Curated Gallery, About/Friends, Moments, Audio BGM, Views/Likes, Draft Preview, Media Library & .tar Backup E2E
         gal_path = os.path.join(SITE, "content/gallery.json")
         abt_path = os.path.join(SITE, "content/about.json")
         bgm_path = os.path.join(SITE, "content/bgm.json")
-        temp_files.extend([gal_path, abt_path, bgm_path])
+        mom_path = os.path.join(SITE, "content/moments.json")
+        stats_path = os.path.join(SITE, "content/stats.txt")
+        temp_files.extend([gal_path, abt_path, bgm_path, mom_path, stats_path])
 
         # 1) Curated Gallery save & public read (+ reject truncated/mismatched JSON)
         for ep, bad_j in [
             ("/api/studio/gallery", b'[{"id":"truncated"'),
             ("/api/studio/about", b'{"bio":"mismatched"]'),
             ("/api/studio/bgm", b'[{}'),
+            ("/api/studio/moments", b'[{"id":"bad"'),
         ]:
             st_tj, _, _ = http_req(ep, method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=bad_j)
             assert_eq(st_tj, 400, f"{ep} must reject truncated/mismatched JSON")
@@ -748,6 +761,57 @@ def test_server():
         assert_eq(st_bs, 200, "POST /api/studio/bgm")
         assert_eq(json.loads(http_req("/bgm.json")[2])[0]["title"], "晴空微风", "GET /bgm.json")
 
+        # 3b) Moments / 碎碎念 save, public read & image reference protection
+        st_mu, _, mu_body = http_req("/api/studio/upload", method="POST", headers={**cookie_hdr, "Content-Type": "image/png"}, data=tiny_png)
+        assert_eq(st_mu, 201, "upload moment PNG")
+        mom_img_url = json.loads(mu_body)["url"]
+        mom_img_name = mom_img_url.rsplit("/", 1)[-1]
+        mom_img_disk = os.path.join(SITE, "content/uploads", mom_img_name)
+        temp_files.append(mom_img_disk)
+        mom_data = [{"id": "m1", "text": "今天晴空超美 https://example.com ✨", "images": [mom_img_url], "mood": "✨ 日常", "date": "2026-11-27 10:00", "pinned": True}]
+        st_ms, _, _ = http_req("/api/studio/moments", method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=json.dumps(mom_data).encode())
+        assert_eq(st_ms, 200, "POST /api/studio/moments")
+        assert_eq(json.loads(http_req("/moments.json")[2])[0]["mood"], "✨ 日常", "GET /moments.json")
+        assert "moments-feed" in http_req("/moments/")[2].decode("utf-8")
+
+        # 3c) Zero-Tracker Post Views & Heart Likes API (+ draft/nonexistent isolation)
+        st_v, hv, bv = http_req("/api/stats/view", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "welcome-to-asmblog"}).encode())
+        assert_eq(st_v, 200, "POST /api/stats/view")
+        assert "no-store" in hv.get("Cache-Control", "")
+        assert_eq(json.loads(bv), {"slug": "welcome-to-asmblog", "views": 1, "likes": 0}, "view count=1")
+        st_l, _, bl = http_req("/api/stats/like", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "welcome-to-asmblog"}).encode())
+        assert_eq(st_l, 200, "POST /api/stats/like")
+        assert_eq(json.loads(bl), {"slug": "welcome-to-asmblog", "views": 1, "likes": 1}, "like count=1")
+        st_s1, _, bs1 = http_req("/api/stats/welcome-to-asmblog")
+        assert_eq(st_s1, 200, "GET /api/stats/:slug")
+        assert_eq(json.loads(bs1), {"slug": "welcome-to-asmblog", "views": 1, "likes": 1}, "GET stats must not increment")
+        st_sa, _, bsa = http_req("/api/stats")
+        assert_eq(st_sa, 200, "GET /api/stats")
+        sa_obj = json.loads(bsa)
+        assert sa_obj["total_views"] >= 1 and sa_obj["total_likes"] >= 1
+        assert_eq(http_req("/api/stats/view", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "no-such-slug"}).encode())[0], 404, "nonexistent slug view -> 404")
+        assert_eq(http_req("/api/stats/view", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "../evil"}).encode())[0], 400, "unsafe slug view -> 400")
+        assert os.path.isfile(stats_path) and "welcome-to-asmblog 1 1" in open(stats_path, encoding="utf-8").read()
+
+        # 3d) Author Draft Live Preview (404 for guests, 200 no-store with banner for logged-in author!)
+        draft_payload = {
+            "title": "私密草稿预览测试",
+            "slug": "studio-draft-preview",
+            "date": "2026-11-27",
+            "summary": "草稿摘要",
+            "draft": "true",
+            "content": "这是一篇未公开的草稿正文。",
+        }
+        assert_eq(http_req("/api/studio/posts", method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=json.dumps(draft_payload).encode())[0], 200, "save draft post")
+        assert_eq(http_req("/post/studio-draft-preview/")[0], 404, "guest must get 404 on draft post")
+        assert_eq(http_req("/api/stats/view", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "studio-draft-preview"}).encode())[0], 404, "stats view on draft must 404")
+        st_dpv, h_dpv, b_dpv = http_req("/post/studio-draft-preview/", headers=cookie_hdr)
+        assert_eq(st_dpv, 200, "logged-in author must preview draft post")
+        assert "no-store" in h_dpv.get("Cache-Control", "") and "ETag" not in h_dpv, f"draft preview must be strictly no-store: {h_dpv}"
+        dpv_txt = b_dpv.decode("utf-8")
+        assert "draft-preview-banner" in dpv_txt and "私密草稿预览测试" in dpv_txt and "未公开的草稿正文" in dpv_txt
+        assert_eq(http_req("/api/studio/posts/studio-draft-preview", method="DELETE", headers=cookie_hdr)[0], 200, "delete draft preview post")
+
         # 4) Media Library reference scan & safe orphan/unused delete
         st_uu, _, uu_body = http_req("/api/studio/upload", method="POST", headers={**cookie_hdr, "Content-Type": "image/png"}, data=tiny_png)
         assert_eq(st_uu, 201, "upload unreferenced PNG")
@@ -765,8 +829,34 @@ def test_server():
         aud_name = aud_url.rsplit("/", 1)[-1]
         assert media_by_name[up_name]["used"] is True and media_by_name[up_name]["part"] is False
         assert media_by_name[aud_name]["used"] is True and media_by_name[aud_name]["part"] is False
+        assert media_by_name[mom_img_name]["used"] is True and media_by_name[mom_img_name]["part"] is False, "moment photo must be protected as used!"
         assert media_by_name[unused_name]["used"] is False and media_by_name[unused_name]["part"] is False
         assert media_by_name[orphan_part_name]["used"] is False and media_by_name[orphan_part_name]["part"] is True
+
+        # 5) One-Click Full Site Backup (.tar POSIX ustar streaming via sendfile)
+        st_bk, h_bk, bk_bytes = http_req("/api/studio/backup", headers=cookie_hdr)
+        assert_eq(st_bk, 200, "GET /api/studio/backup")
+        assert "application/x-tar" in h_bk.get("Content-Type", ""), f"bad backup mime: {h_bk}"
+        assert "no-store" in h_bk.get("Cache-Control", "")
+        assert ".tar" in h_bk.get("Content-Disposition", "")
+        assert not os.path.exists(os.path.join(SITE, "content/.backup.tar.tmp")), "unlinked backup temp file must not remain on disk"
+        with tarfile.open(fileobj=io.BytesIO(bk_bytes), mode="r:") as tf:
+            names = set(tf.getnames())
+            for req_arc in (
+                "asmblog-backup/config.ini",
+                "asmblog-backup/content/posts/welcome-to-asmblog.md",
+                "asmblog-backup/content/gallery.json",
+                "asmblog-backup/content/about.json",
+                "asmblog-backup/content/bgm.json",
+                "asmblog-backup/content/moments.json",
+                "asmblog-backup/content/stats.txt",
+                f"asmblog-backup/content/uploads/{up_name}",
+                f"asmblog-backup/content/uploads/{mom_img_name}",
+            ):
+                assert req_arc in names, f"missing expected backup member {req_arc} in {sorted(names)}"
+            assert all("/." not in n for n in names), f"hidden dotfile leaked into backup tar: {names}"
+            assert_eq(tf.extractfile(f"asmblog-backup/content/uploads/{up_name}").read(), tiny_png, "backup PNG bytes exact match")
+            assert "welcome-to-asmblog 1 1" in tf.extractfile("asmblog-backup/content/stats.txt").read().decode("utf-8")
 
         # Reject protected/unsafe delete names; allow deleting unused & orphan .part
         for bad_n in (".gitkeep", "../config.ini", "a/b.png", "."):
@@ -776,7 +866,7 @@ def test_server():
             st_od, _, _ = http_req("/api/studio/media/delete", method="POST", headers={**cookie_hdr, "Content-Type": "application/json"}, data=json.dumps({"name": ok_n}).encode())
             assert_eq(st_od, 200, f"media delete {ok_n}")
         assert not os.path.exists(orphan_part_disk)
-        for p_clean in (gal_path, abt_path, bgm_path, aud_disk):
+        for p_clean in (gal_path, abt_path, bgm_path, mom_path, stats_path, aud_disk, mom_img_disk):
             if os.path.exists(p_clean):
                 os.unlink(p_clean)
                 temp_files.remove(p_clean)

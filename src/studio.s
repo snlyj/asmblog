@@ -12,7 +12,7 @@
 .align 8
 st_resp_buf:    .skip 262144
 st_file_buf:    .skip 262144
-st_ref_buf:     .skip 262144
+st_ref_buf:     .skip 524288
 st_media_dents: .skip 16384
 st_hdr_buf:     .skip 512
 st_path_buf:    .skip 512
@@ -345,6 +345,8 @@ st_f_abt:       .asciz "content/about.json"
 st_f_abt_tmp:   .asciz "content/.about.json.tmp"
 st_f_bgm:       .asciz "content/bgm.json"
 st_f_bgm_tmp:   .asciz "content/.bgm.json.tmp"
+st_f_mom:       .asciz "content/moments.json"
+st_f_mom_tmp:   .asciz "content/.moments.json.tmp"
 st_p_posts_pre: .ascii "content/posts/"
 .equ st_p_posts_pre_len, . - st_p_posts_pre
 st_p_posts_dot: .ascii "content/posts/."
@@ -380,6 +382,7 @@ ext_wav_s:      .ascii ".wav"
 .section .text
 
 # studio_send_json(rdi=conn, rsi=status_cstr, rdx=body_ptr, rcx=body_len, r8=extra_hdr_or_0)
+.globl studio_send_json
 studio_send_json:
     test r8, r8
     jnz .Lssj_go
@@ -628,6 +631,7 @@ session_revoke_others:
     ret
 
 # studio_is_authed(rdi=&req) -> rax=1 authed, 0 not authed
+.globl studio_is_authed
 studio_is_authed:
     push r12
     mov r12, rdi
@@ -2781,16 +2785,23 @@ handle_studio_bgm_save:
     mov r8d, '['
     jmp studio_save_json_file
 
+.globl handle_studio_moments_save
+handle_studio_moments_save:
+    lea rdx, [rip + st_f_mom]
+    lea rcx, [rip + st_f_mom_tmp]
+    mov r8d, '['
+    jmp studio_save_json_file
+
 # =========================================================================
 # 15. GET /api/studio/media & POST /api/studio/media/delete
-#     Scans content/uploads/, cross-references posts + config + gallery/about/bgm!
+#     Scans content/uploads/, cross-references posts + config + gallery/about/bgm/moments!
 # =========================================================================
 
-# load_media_refs() -> concatenates gallery/about/bgm JSON + avatar/banner into st_ref_buf; returns rax=len
+# load_media_refs() -> concatenates gallery/about/bgm/moments JSON + avatar/banner into st_ref_buf; returns rax=len
 load_media_refs:
     push rbx
     sub rsp, 32           # [rsp+0..23]=sbuf (1 push + ret = 16, +32 = 48 aligned)
-    mov rdi, rsp; lea rsi, [rip + st_ref_buf]; mov edx, 262143; call sb_init
+    mov rdi, rsp; lea rsi, [rip + st_ref_buf]; mov edx, 524287; call sb_init
 
     lea rdi, [rip + st_f_gal]; lea rsi, [rip + st_file_buf]; mov edx, 262143; call read_file_buf
     test rax, rax; jle .Llmr_abt
@@ -2803,6 +2814,11 @@ load_media_refs:
     mov rdi, rsp; mov esi, 10; call sb_byte
 .Llmr_bgm:
     lea rdi, [rip + st_f_bgm]; lea rsi, [rip + st_file_buf]; mov edx, 262143; call read_file_buf
+    test rax, rax; jle .Llmr_mom
+    mov rdi, rsp; lea rsi, [rip + st_file_buf]; mov rdx, rax; call sb_mem
+    mov rdi, rsp; mov esi, 10; call sb_byte
+.Llmr_mom:
+    lea rdi, [rip + st_f_mom]; lea rsi, [rip + st_file_buf]; mov edx, 262143; call read_file_buf
     test rax, rax; jle .Llmr_cfg
     mov rdi, rsp; lea rsi, [rip + st_file_buf]; mov rdx, rax; call sb_mem
     mov rdi, rsp; mov esi, 10; call sb_byte

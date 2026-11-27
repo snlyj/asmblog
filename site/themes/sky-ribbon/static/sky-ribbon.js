@@ -188,6 +188,7 @@
      --------------------------------------------------------- */
   function matchNavKey(pathname) {
     var p = pathname || window.location.pathname;
+    if (p.indexOf('/moments') === 0) return '/moments';
     if (p.indexOf('/gallery') === 0) return '/gallery';
     if (p.indexOf('/archive') === 0) return '/archive';
     if (p.indexOf('/tags') === 0 || p.indexOf('/tag/') === 0) return '/tags';
@@ -1874,16 +1875,279 @@
       .catch(function () {});
   }
 
+  /* Zero-Tracker Article Views & Heart Likes (/api/stats/*) */
+  function initArticleStats() {
+    var art = document.querySelector('article[data-post-slug]');
+    if (!art || art.dataset.statsInit) return;
+    art.dataset.statsInit = '1';
+    var slug = (art.getAttribute('data-post-slug') || '').trim();
+    if (!slug) return;
+
+    var viewsWrap = document.getElementById('post-views-wrap');
+    var viewsNum = document.getElementById('post-views-num');
+    var likeBtn = document.getElementById('like-post-btn');
+    var likeNum = document.getElementById('like-post-num');
+    var isDraft = !!art.querySelector('.draft-preview-banner');
+    var viewKey = 'asmblog-viewed-' + slug;
+    var likeKey = 'asmblog-liked-' + slug;
+
+    function isLikedLocal() {
+      try { return localStorage.getItem(likeKey) === '1'; } catch (_) { return false; }
+    }
+    function setLikedUI(liked) {
+      if (!likeBtn) return;
+      likeBtn.classList.toggle('is-liked', liked);
+      likeBtn.setAttribute('aria-pressed', liked ? 'true' : 'false');
+      var heart = likeBtn.querySelector('.like-heart');
+      var lbl = likeBtn.querySelector('.like-label');
+      if (heart) heart.textContent = liked ? '♥' : '♡';
+      if (lbl) lbl.textContent = liked ? '已喜欢' : '喜欢';
+    }
+    function applyCounts(d) {
+      if (!d || typeof d !== 'object') return;
+      if (viewsNum && typeof d.views === 'number') {
+        viewsNum.textContent = String(d.views);
+        if (viewsWrap) viewsWrap.classList.remove('hidden');
+      }
+      if (likeNum && typeof d.likes === 'number') {
+        likeNum.textContent = String(d.likes);
+        if (likeBtn && !isDraft) likeBtn.classList.remove('hidden');
+      }
+    }
+
+    setLikedUI(isLikedLocal());
+
+    var alreadyViewed = false;
+    try { alreadyViewed = sessionStorage.getItem(viewKey) === '1'; } catch (_) {}
+
+    var req = (isDraft || alreadyViewed)
+      ? fetch('/api/stats/' + encodeURIComponent(slug), { cache: 'no-store' })
+      : fetch('/api/stats/view', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: slug })
+        });
+
+    req
+      .then(function (r) {
+        if (!r.ok) throw new Error('stats unavailable');
+        return r.json();
+      })
+      .then(function (d) {
+        if (!isDraft && !alreadyViewed) {
+          try { sessionStorage.setItem(viewKey, '1'); } catch (_) {}
+        }
+        applyCounts(d);
+      })
+      .catch(function () {
+        /* Gracefully stay hidden on static-only hosting */
+      });
+
+    if (likeBtn && !isDraft) {
+      var busy = false;
+      likeBtn.addEventListener('click', function () {
+        if (busy) return;
+        if (isLikedLocal()) {
+          likeBtn.classList.remove('is-popping');
+          void likeBtn.offsetWidth;
+          likeBtn.classList.add('is-popping');
+          showToast('已经给这篇文章比过心啦 ♥');
+          return;
+        }
+        busy = true;
+        fetch('/api/stats/like', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: slug })
+        })
+          .then(function (r) {
+            if (r.status === 429) {
+              showToast('点赞太热情啦，稍等片刻再试哦～');
+              return null;
+            }
+            if (!r.ok) throw new Error('like failed');
+            return r.json();
+          })
+          .then(function (d) {
+            if (!d) return;
+            try { localStorage.setItem(likeKey, '1'); } catch (_) {}
+            setLikedUI(true);
+            applyCounts(d);
+            likeBtn.classList.remove('is-popping');
+            void likeBtn.offsetWidth;
+            likeBtn.classList.add('is-popping');
+            showToast('感谢你的喜欢 ♥');
+          })
+          .catch(function () {
+            showToast('点赞请求失败，请稍后重试');
+          })
+          .finally(function () { busy = false; });
+      });
+    }
+  }
+
+  /* Moments / 碎碎念 Timeline (/moments/) */
+  function formatMomentText(raw) {
+    var escaped = esc(raw || '');
+    escaped = escaped.replace(/(https?:\/\/[^\s<>"'）)，。！？；：、\]》】]+)/gi, function (u) {
+      var trail = '';
+      while (/[.,;:!?]$/.test(u)) {
+        trail = u.slice(-1) + trail;
+        u = u.slice(0, -1);
+      }
+      return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + u + '</a>' + trail;
+    });
+    return escaped.replace(/\n/g, '<br>');
+  }
+
+  function initMoments() {
+    var feed = document.getElementById('moments-feed');
+    var bar = document.getElementById('moments-filter-bar');
+    var moreWrap = document.getElementById('moments-more-wrap');
+    if (!feed || feed.dataset.momInit) return;
+    feed.dataset.momInit = '1';
+
+    var author = feed.getAttribute('data-author') || '博主';
+    var avatar = feed.getAttribute('data-avatar') || '/static/avatar.webp?v=3&orig=/static/avatar.jpg';
+    if (!isSafeFrontUrl(avatar)) avatar = '/static/avatar.webp?v=3&orig=/static/avatar.jpg';
+
+    fetch('/moments.json')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var all = (Array.isArray(data) ? data : []).filter(function (m) {
+          if (!m || typeof m !== 'object') return false;
+          var hasTxt = String(m.text || '').trim().length > 0;
+          var imgs = Array.isArray(m.images) ? m.images.filter(isSafeFrontUrl) : [];
+          return hasTxt || imgs.length > 0;
+        });
+        // Sort pinned moments first while preserving relative chronological order
+        all = all.filter(function (m) { return !!m.pinned; }).concat(all.filter(function (m) { return !m.pinned; }));
+
+        if (!all.length) {
+          if (bar) bar.innerHTML = '';
+          if (moreWrap) moreWrap.innerHTML = '';
+          feed.innerHTML = '<div class="empty-state">碎碎念还是空的～ 博主可以在创作后台「💬 碎碎念」随手发第一条动态 ✦</div>';
+          recalcMetrics();
+          return;
+        }
+
+        var activeMood = '';
+        var limit = 15;
+        var moodCounts = {};
+        all.forEach(function (m) {
+          var md = String(m.mood || '').trim();
+          if (md) moodCounts[md] = (moodCounts[md] || 0) + 1;
+        });
+        var moods = Object.keys(moodCounts);
+
+        function renderBar() {
+          if (!bar) return;
+          if (!moods.length) { bar.innerHTML = ''; return; }
+          var html = '<button type="button" class="cat-pill' + (!activeMood ? ' is-active' : '') + '" data-mom-mood="">全部 <span class="cat-count">' + all.length + '</span></button>';
+          moods.forEach(function (md) {
+            html += '<button type="button" class="cat-pill' + (activeMood === md ? ' is-active' : '') + '" data-mom-mood="' + esc(md) + '">' + esc(md) + ' <span class="cat-count">' + moodCounts[md] + '</span></button>';
+          });
+          bar.innerHTML = html;
+          bar.querySelectorAll('[data-mom-mood]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              activeMood = btn.getAttribute('data-mom-mood') || '';
+              limit = 15;
+              renderBar();
+              renderFeed();
+            });
+          });
+        }
+
+        function renderFeed() {
+          var filtered = activeMood
+            ? all.filter(function (m) { return String(m.mood || '').trim() === activeMood; })
+            : all;
+          var shown = filtered.slice(0, limit);
+          feed.innerHTML = shown.map(function (m, idx) {
+            var imgs = (Array.isArray(m.images) ? m.images : []).filter(isSafeFrontUrl).slice(0, 9);
+            var gridCls = imgs.length === 1 ? 'photos-1' : ((imgs.length === 2 || imgs.length === 4) ? 'photos-2' : 'photos-3');
+            var photosHtml = imgs.length
+              ? '<div class="moment-photos ' + gridCls + '">' + imgs.map(function (u, pi) {
+                  return '<button type="button" class="moment-photo-item" data-midx="' + idx + '" data-pidx="' + pi + '" aria-label="放大查看图片">' +
+                    '<img class="moment-photo-img" src="' + esc(u) + '" alt="" loading="lazy" decoding="async">' +
+                    '</button>';
+                }).join('') + '</div>'
+              : '';
+            var pinHtml = m.pinned ? '<span class="pin-badge">📌 置顶</span>' : '';
+            var moodHtml = m.mood ? '<span class="moment-mood">' + esc(m.mood) + '</span>' : '';
+            var txtHtml = String(m.text || '').trim() ? '<p class="moment-text">' + formatMomentText(m.text) + '</p>' : '';
+            return (
+              '<article class="moment-card">' +
+                '<div class="moment-head">' +
+                  '<img class="moment-avatar" src="' + esc(avatar) + '" alt="' + esc(author) + '" loading="lazy" decoding="async">' +
+                  '<div class="moment-meta">' +
+                    '<div class="moment-author-row">' +
+                      '<span class="moment-author">' + esc(author) + '</span>' +
+                      pinHtml + moodHtml +
+                    '</div>' +
+                    '<div class="moment-time">' + esc(m.date || '') + '</div>' +
+                  '</div>' +
+                '</div>' +
+                txtHtml + photosHtml +
+              '</article>'
+            );
+          }).join('');
+
+          feed.querySelectorAll('.moment-photo-item').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              var mi = parseInt(btn.getAttribute('data-midx') || '0', 10);
+              var pi = parseInt(btn.getAttribute('data-pidx') || '0', 10);
+              var m = shown[mi];
+              if (!m) return;
+              var imgs = (Array.isArray(m.images) ? m.images : []).filter(isSafeFrontUrl).slice(0, 9);
+              var lbItems = imgs.map(function (u) {
+                return { src: u, orig: extractOrigUrl(u), alt: (m.mood ? m.mood + ' · ' : '') + (m.date || '') };
+              });
+              openLightbox(lbItems, pi);
+            });
+          });
+          feed.querySelectorAll('.moment-photo-img').forEach(function (im) {
+            if (im.complete && im.naturalWidth > 0) return;
+            im.classList.add('img-fade');
+            var done = function () { im.classList.add('is-loaded'); recalcMetrics(); };
+            im.addEventListener('load', done, { once: true });
+            im.addEventListener('error', done, { once: true });
+          });
+
+          if (moreWrap) {
+            if (filtered.length > limit) {
+              moreWrap.innerHTML = '<button type="button" class="moments-more-btn">展开更多碎碎念（还有 ' + (filtered.length - limit) + ' 条）</button>';
+              moreWrap.querySelector('button').addEventListener('click', function () {
+                limit += 15;
+                renderFeed();
+              });
+            } else {
+              moreWrap.innerHTML = '';
+            }
+          }
+          recalcMetrics();
+        }
+
+        renderBar();
+        renderFeed();
+      })
+      .catch(function () {
+        feed.innerHTML = '<div class="empty-state">碎碎念加载失败，请稍后刷新重试～</div>';
+      });
+  }
+
   function hydratePage(animate) {
     if (animate) animateStageCards();
     enhanceImages();
     enhanceVideos();
     enhanceCodeBlocks();
     initArticleExtras();
+    initArticleStats();
     initArchiveYears();
     initComments();
     initGallery();
     initAbout();
+    initMoments();
     initLightbox();
     bindAvatarBoing();
     initSearch();

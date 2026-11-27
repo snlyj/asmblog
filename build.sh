@@ -16,6 +16,8 @@ SRCS=(
     src/store.s
     src/handlers.s
     src/studio.s
+    src/stats.s
+    src/backup.s
     src/net_epoll.s
     src/cli.s
     src/main.s

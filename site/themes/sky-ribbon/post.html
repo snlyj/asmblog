@@ -1,6 +1,7 @@
 <div class="feed-wrap">
-  <article class="article-card reveal">
+  <article class="article-card reveal" data-post-slug="{{ slug }}">
     <div class="ribbon-corner" aria-hidden="true"><span>★</span></div>
+    {{#is_draft}}<div class="draft-preview-banner">📝 草稿预览模式 · 仅当前已登录博主可见（公开访客将看到 404）</div>{{/is_draft}}
     <header class="article-header">
       <div class="article-crumb">
         <a href="/">&larr; 返回晴空首页</a>
@@ -18,6 +19,7 @@
         <span>约 {{ read_min }} 分钟阅读</span>
         <span class="meta-dot">✦</span>
         <span>{{ author }}</span>
+        <span id="post-views-wrap" class="post-views-wrap hidden"><span class="meta-dot">✦</span> <span id="post-views-num">0</span> 次阅读</span>
       </div>
       <h1 class="article-title">{{ title }}</h1>
       <div class="tag-row">{{{ tags_html }}}</div>
@@ -37,7 +39,14 @@
 
     <footer class="article-foot">
       <span class="article-sign">✦ 本文由 <strong>{{ author }}</strong> 发布于 {{ date }}</span>
-      <button id="share-post-btn" class="share-btn" type="button">🔗 复制链接</button>
+      <div class="article-foot-actions">
+        <button id="like-post-btn" class="like-btn hidden" type="button" aria-label="喜欢这篇文章" aria-pressed="false">
+          <span class="like-heart" aria-hidden="true">♡</span>
+          <span class="like-label">喜欢</span>
+          <span id="like-post-num" class="like-count">0</span>
+        </button>
+        <button id="share-post-btn" class="share-btn" type="button">🔗 复制链接</button>
+      </div>
     </footer>
   </article>
 

@@ -97,6 +97,8 @@ p_gallery_dir:  .ascii "/gallery"
 .equ p_gallery_dir_len, . - p_gallery_dir
 p_about_dir:    .ascii "/about"
 .equ p_about_dir_len, . - p_about_dir
+p_moments_dir:  .ascii "/moments"
+.equ p_moments_dir_len, . - p_moments_dir
 p_static_dir:   .ascii "/static"
 .equ p_static_dir_len, . - p_static_dir
 p_uploads_dir:  .ascii "/uploads"
@@ -111,9 +113,12 @@ p_abt_json:     .ascii "/about.json"
 .equ p_abt_json_len, . - p_abt_json
 p_bgm_json:     .ascii "/bgm.json"
 .equ p_bgm_json_len, . - p_bgm_json
+p_mom_json:     .ascii "/moments.json"
+.equ p_mom_json_len, . - p_mom_json
 src_gal_json:   .asciz "content/gallery.json"
 src_abt_json:   .asciz "content/about.json"
 src_bgm_json:   .asciz "content/bgm.json"
+src_mom_json:   .asciz "content/moments.json"
 def_empty_arr:  .ascii "[]"
 def_empty_obj:  .ascii "{}"
 p_rss_xml:      .ascii "/rss.xml"
@@ -820,7 +825,8 @@ do_cmd_build:
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_cat_dir];    mov ecx, p_cat_dir_len;    call build_mkdir_sub
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_search_dir]; mov ecx, p_search_dir_len; call build_mkdir_sub
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_gallery_dir]; mov ecx, p_gallery_dir_len; call build_mkdir_sub
-    mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_about_dir];  mov ecx, p_about_dir_len;  call build_mkdir_sub
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_about_dir];   mov ecx, p_about_dir_len;   call build_mkdir_sub
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_moments_dir]; mov ecx, p_moments_dir_len; call build_mkdir_sub
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_static_dir]; mov ecx, p_static_dir_len; call build_mkdir_sub
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_uploads_dir]; mov ecx, p_uploads_dir_len; call build_mkdir_sub
 
@@ -1029,13 +1035,24 @@ do_cmd_build:
     mov rdi, rsp; xor esi, esi; call sb_byte
     lea rdi, [rip + cli_path1]; mov rsi, r14; mov rdx, r15; call write_file_direct
 
-    # 7c. dist/gallery.json, dist/about.json, dist/bgm.json (copy if present, else empty JSON)
+    call render_moments_page
+    mov r14, rax; mov r15, rdx
+    mov rdi, rsp; lea rsi, [rip + cli_path1]; mov edx, 1023; call sb_init
+    mov rdi, rsp; mov rsi, r12; mov rdx, r13; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + p_moments_dir]; mov edx, p_moments_dir_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + p_index_html]; mov edx, p_index_html_len; call sb_mem
+    mov rdi, rsp; xor esi, esi; call sb_byte
+    lea rdi, [rip + cli_path1]; mov rsi, r14; mov rdx, r15; call write_file_direct
+
+    # 7c. dist/{gallery,about,bgm,moments}.json (copy if present, else empty JSON)
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_gal_json]; mov ecx, p_gal_json_len
     lea r8, [rip + src_gal_json]; lea r9, [rip + def_empty_arr]; call build_copy_or_def
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_abt_json]; mov ecx, p_abt_json_len
     lea r8, [rip + src_abt_json]; lea r9, [rip + def_empty_obj]; call build_copy_or_def
     mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_bgm_json]; mov ecx, p_bgm_json_len
     lea r8, [rip + src_bgm_json]; lea r9, [rip + def_empty_arr]; call build_copy_or_def
+    mov rdi, r12; mov rsi, r13; lea rdx, [rip + p_mom_json]; mov ecx, p_mom_json_len
+    lea r8, [rip + src_mom_json]; lea r9, [rip + def_empty_arr]; call build_copy_or_def
 
     # 8. dist/search-index.json
     call render_search_index_json

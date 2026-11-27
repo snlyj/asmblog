@@ -24,12 +24,24 @@ pat_gallery:       .ascii "/gallery"
 .equ pat_gallery_len, . - pat_gallery
 pat_about:         .ascii "/about"
 .equ pat_about_len, . - pat_about
+pat_moments:       .ascii "/moments"
+.equ pat_moments_len, . - pat_moments
 pat_gallery_json:  .ascii "/gallery.json"
 .equ pat_gallery_json_len, . - pat_gallery_json
 pat_about_json:    .ascii "/about.json"
 .equ pat_about_json_len, . - pat_about_json
 pat_bgm_json:      .ascii "/bgm.json"
 .equ pat_bgm_json_len, . - pat_bgm_json
+pat_moments_json:  .ascii "/moments.json"
+.equ pat_moments_json_len, . - pat_moments_json
+pat_stats_all:     .ascii "/api/stats"
+.equ pat_stats_all_len, . - pat_stats_all
+pat_stats_view:    .ascii "/api/stats/view"
+.equ pat_stats_view_len, . - pat_stats_view
+pat_stats_like:    .ascii "/api/stats/like"
+.equ pat_stats_like_len, . - pat_stats_like
+pat_stats_one:     .ascii "/api/stats/:slug"
+.equ pat_stats_one_len, . - pat_stats_one
 pat_search_idx:    .ascii "/search-index.json"
 .equ pat_search_idx_len, . - pat_search_idx
 pat_rss:           .ascii "/rss.xml"
@@ -76,6 +88,10 @@ pat_st_media:      .ascii "/api/studio/media"
 .equ pat_st_media_len, . - pat_st_media
 pat_st_media_del:  .ascii "/api/studio/media/delete"
 .equ pat_st_media_del_len, . - pat_st_media_del
+pat_st_moments:    .ascii "/api/studio/moments"
+.equ pat_st_moments_len, . - pat_st_moments
+pat_st_backup:     .ascii "/api/studio/backup"
+.equ pat_st_backup_len, . - pat_st_backup
 
 .align 8
 route_table:
@@ -89,9 +105,15 @@ route_table:
     .quad METH_GET,    pat_search,      pat_search_len,      handle_search,             0
     .quad METH_GET,    pat_gallery,     pat_gallery_len,     handle_gallery,            0
     .quad METH_GET,    pat_about,       pat_about_len,       handle_about,              0
+    .quad METH_GET,    pat_moments,     pat_moments_len,     handle_moments,            0
     .quad METH_GET,    pat_gallery_json, pat_gallery_json_len, handle_gallery_json,     0
     .quad METH_GET,    pat_about_json,  pat_about_json_len,  handle_about_json,         0
     .quad METH_GET,    pat_bgm_json,    pat_bgm_json_len,    handle_bgm_json,           0
+    .quad METH_GET,    pat_moments_json, pat_moments_json_len, handle_moments_json,     0
+    .quad METH_GET,    pat_stats_all,   pat_stats_all_len,   handle_stats_all,          0
+    .quad METH_POST,   pat_stats_view,  pat_stats_view_len,  handle_stats_view,         0
+    .quad METH_POST,   pat_stats_like,  pat_stats_like_len,  handle_stats_like,         0
+    .quad METH_GET,    pat_stats_one,   pat_stats_one_len,   handle_stats_one,          0
     .quad METH_GET,    pat_search_idx,  pat_search_idx_len,  handle_search_index,       0
     .quad METH_GET,    pat_rss,         pat_rss_len,         handle_rss,                0
     .quad METH_GET,    pat_sitemap,     pat_sitemap_len,     handle_sitemap,            0
@@ -118,6 +140,8 @@ route_table:
     .quad METH_POST,   pat_st_bgm,      pat_st_bgm_len,      handle_studio_bgm_save,     0
     .quad METH_GET,    pat_st_media,    pat_st_media_len,    handle_studio_media_list,   0
     .quad METH_POST,   pat_st_media_del, pat_st_media_del_len, handle_studio_media_del,  0
+    .quad METH_POST,   pat_st_moments,  pat_st_moments_len,  handle_studio_moments_save, 0
+    .quad METH_GET,    pat_st_backup,   pat_st_backup_len,   handle_studio_backup,      0
     .quad 0, 0, 0, 0, 0
 
 msg_405: .asciz "405 Method Not Allowed"

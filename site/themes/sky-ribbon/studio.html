@@ -767,6 +767,121 @@
     .badge-ok { background: var(--ok-soft); color: var(--ok); }
     .badge-muted { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
 
+    /* Moments Composer & Backup Card */
+    .mom-compose {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1.5px dashed var(--border-strong);
+      background: var(--surface-soft);
+      margin-bottom: 16px;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .mom-compose.is-drag { border-color: var(--pink); background: var(--pink-soft); }
+    .mom-mood-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .mood-chip {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .mood-chip.is-active, .mood-chip:hover {
+      border-color: var(--sky);
+      background: var(--sky-soft);
+      color: var(--sky-fg);
+    }
+    .mom-thumbs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .mom-thumb-item {
+      position: relative;
+      width: 74px;
+      height: 74px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+    }
+    .mom-thumb-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .mom-thumb-rm {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(15, 23, 42, 0.76);
+      color: #ffffff;
+      font-size: 11px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mom-compose-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .mom-row {
+      padding: 13px 15px;
+      border-radius: 16px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .mom-row-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .mom-row-text {
+      margin: 0;
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: var(--fg);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .mom-row-imgs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .mom-row-imgs img {
+      width: 58px;
+      height: 58px;
+      border-radius: 10px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+    }
+    .backup-card {
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .backup-card h3 { margin: 0 0 4px; font-size: 0.98rem; color: var(--fg); }
+    .backup-card p { margin: 0; font-size: 0.82rem; color: var(--muted); }
+
     /* Toast */
     .toast {
       position: fixed;
@@ -833,6 +948,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab-btn is-active" data-tab="write" type="button">✍️ 写文章</button>
       <button class="tab-btn" data-tab="posts" type="button">📚 文章 (<span id="cnt-posts">0</span>)</button>
+      <button class="tab-btn" data-tab="moments" type="button">💬 碎碎念 (<span id="cnt-moments">0</span>)</button>
       <button class="tab-btn" data-tab="gallery" type="button">🖼️ 画廊 (<span id="cnt-gallery">0</span>)</button>
       <button class="tab-btn" data-tab="media" type="button">🗂️ 媒体库 (<span id="cnt-media">0</span>)</button>
       <button class="tab-btn" data-tab="about" type="button">🎀 关于</button>
@@ -970,7 +1086,7 @@
   <!-- TAB 2: Posts Management -->
   <section id="tab-posts" class="panel hidden">
     <div class="panel-head">
-      <h2 class="panel-title">📚 全部文章管理 <span id="posts-match-count" class="badge"></span></h2>
+      <h2 class="panel-title">📚 全部文章管理 <span id="posts-match-count" class="badge"></span> <span id="posts-stats-badge" class="badge badge-pink"></span></h2>
       <button id="refresh-posts-btn" class="btn btn-soft btn-sm" type="button">↻ 刷新列表</button>
     </div>
     <div id="posts-filter-bar" class="posts-filter-bar">
@@ -983,8 +1099,54 @@
       <select id="posts-cat-filter" class="sel" aria-label="按分类筛选">
         <option value="">全部分类</option>
       </select>
+      <select id="posts-sort" class="sel" aria-label="排序方式">
+        <option value="default">按时间 / 置顶</option>
+        <option value="views">按阅读量降序</option>
+        <option value="likes">按喜欢数降序</option>
+      </select>
     </div>
     <div id="posts-list" class="item-list"></div>
+  </section>
+
+  <!-- TAB 2b: Moments / 碎碎念 Quick Composer & Timeline Manager -->
+  <section id="tab-moments" class="panel hidden">
+    <div class="panel-head">
+      <h2 class="panel-title">💬 碎碎念动态 <span class="badge badge-lilac">随手记录日常 · 最多配 9 图</span></h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn btn-sm" href="/moments/" target="_blank">查看动态页 ↗</a>
+      </div>
+    </div>
+
+    <div id="mom-compose-box" class="mom-compose">
+      <textarea id="mom-text" class="txt" rows="3" placeholder="此刻在想什么？刚看完哪部番、拍到了好看的天空，都可以随手记下来～（支持拖入或 Ctrl+V 粘贴图片，Ctrl+Enter 快速发送）"></textarea>
+      <div class="mom-mood-bar">
+        <span class="field-hint">心情标签：</span>
+        <button type="button" class="mood-chip" data-mood-pick="✨ 日常">✨ 日常</button>
+        <button type="button" class="mood-chip" data-mood-pick="🎬 追番">🎬 追番</button>
+        <button type="button" class="mood-chip" data-mood-pick="📷 随手拍">📷 随手拍</button>
+        <button type="button" class="mood-chip" data-mood-pick="🎵 听歌">🎵 听歌</button>
+        <button type="button" class="mood-chip" data-mood-pick="💭 碎碎念">💭 碎碎念</button>
+        <input id="mom-mood" class="inp" type="text" maxlength="24" placeholder="自定义心情（选填）" style="max-width:168px;padding:5px 10px;font-size:0.82rem">
+      </div>
+      <div id="mom-imgs-preview" class="mom-thumbs hidden"></div>
+      <div class="mom-compose-foot">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <button id="mom-img-btn" class="btn btn-pink btn-sm" type="button">🖼️ 配图 (0/9)</button>
+          <label class="chk-wrap" style="font-size:0.84rem">
+            <input id="mom-pinned" type="checkbox">
+            <span>📌 置顶这条动态</span>
+          </label>
+          <span id="mom-status" class="field-hint"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="mom-cancel-edit-btn" class="btn btn-sm hidden" type="button">取消编辑</button>
+          <button id="mom-submit-btn" class="btn btn-primary btn-sm" type="button">✦ 发布碎碎念</button>
+        </div>
+      </div>
+      <input id="mom-img-files" type="file" accept="image/*" multiple class="hidden">
+    </div>
+
+    <div id="mom-admin-list" class="dyn-list"></div>
   </section>
 
   <!-- TAB 3: Curated Illustration Gallery (100% Author-Selected!) -->
@@ -1204,6 +1366,17 @@
       <span class="field-hint">所有设置会原子写入 config.ini 并立刻热重载生效。</span>
       <button id="save-settings-btn" class="btn btn-primary" type="button">✦ 保存站点设置</button>
     </div>
+
+    <div class="backup-card">
+      <div>
+        <h3>🛡️ 整站数据一键备份</h3>
+        <p>将全部文章（含草稿）、碎碎念、精选画廊、关于友链、歌单、阅读点赞统计、上传的图片音视频与站点配置打包为单个 .tar 文件下载留底。</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span id="backup-status" class="field-hint"></span>
+        <button id="backup-download-btn" class="btn btn-soft btn-sm" type="button">📦 一键下载整站备份 (.tar)</button>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -1299,9 +1472,12 @@
   var postsList = document.getElementById('posts-list');
   var postsSearch = document.getElementById('posts-search');
   var postsCatFilter = document.getElementById('posts-cat-filter');
+  var postsSort = document.getElementById('posts-sort');
   var postsMatchCount = document.getElementById('posts-match-count');
+  var postsStatsBadge = document.getElementById('posts-stats-badge');
   var catsGrid = document.getElementById('cats-grid');
   var cntPosts = document.getElementById('cnt-posts');
+  var cntMoments = document.getElementById('cnt-moments');
   var cntGallery = document.getElementById('cnt-gallery');
   var cntMedia = document.getElementById('cnt-media');
   var cntBgm = document.getElementById('cnt-bgm');
@@ -1314,6 +1490,12 @@
   var state = {
     posts: [],
     cats: [],
+    moments: [],
+    momImgs: [],
+    editingMomentId: '',
+    statsMap: {},
+    statsTotal: { views: 0, likes: 0 },
+    postSort: 'default',
     gallery: [],
     media: [],
     mediaFilter: 'all',
@@ -1561,7 +1743,7 @@
   }
 
   /* Tabs */
-  var ALL_TABS = ['write', 'posts', 'gallery', 'media', 'about', 'bgm', 'cats', 'settings'];
+  var ALL_TABS = ['write', 'posts', 'moments', 'gallery', 'media', 'about', 'bgm', 'cats', 'settings'];
   function switchTab(name) {
     state.activeTab = name;
     document.querySelectorAll('.tab-btn').forEach(function (b) {
@@ -2498,7 +2680,7 @@
         editorSlugBadge.classList.remove('hidden');
         saveBtn.textContent = '✦ 保存修改';
         var viewLink = fDraft.checked
-          ? '草稿已保存 ✦'
+          ? '草稿已保存 ✦ <a href="/post/' + esc(res.slug) + '/" target="_blank">前台预览 ↗</a>'
           : '发布成功 ✦ <a href="/post/' + esc(res.slug) + '/" target="_blank">立即查看 ↗</a>';
         showToast(viewLink);
         return refreshAll();
@@ -2552,9 +2734,12 @@
     }).join('');
   }
 
-  /* Load Posts into Management List (with Search, Status & Category Filter + 1-Click Publish/Draft) */
+  /* Load Posts into Management List (with Search, Status, Category Filter, Stats Sort + Draft Preview) */
   function renderPosts() {
     cntPosts.textContent = String(state.posts.length);
+    if (postsStatsBadge) {
+      postsStatsBadge.textContent = '👁 ' + (state.statsTotal.views || 0) + ' 阅读 · ♥ ' + (state.statsTotal.likes || 0) + ' 喜欢';
+    }
     if (!state.posts.length) {
       if (postsMatchCount) postsMatchCount.textContent = '0 篇';
       postsList.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0">还没有发布过文章，去「写文章」创作第一篇吧～</p>';
@@ -2573,6 +2758,19 @@
       }
       return true;
     });
+    if (state.postSort === 'views') {
+      filtered = filtered.slice().sort(function (a, b) {
+        var sa = (state.statsMap[a.slug] || {}).views || 0;
+        var sb = (state.statsMap[b.slug] || {}).views || 0;
+        return sb - sa;
+      });
+    } else if (state.postSort === 'likes') {
+      filtered = filtered.slice().sort(function (a, b) {
+        var sa = (state.statsMap[a.slug] || {}).likes || 0;
+        var sb = (state.statsMap[b.slug] || {}).likes || 0;
+        return sb - sa;
+      });
+    }
     if (postsMatchCount) {
       postsMatchCount.textContent = filtered.length === state.posts.length
         ? ('共 ' + state.posts.length + ' 篇')
@@ -2583,6 +2781,7 @@
       return;
     }
     postsList.innerHTML = filtered.map(function (p) {
+      var st = state.statsMap[p.slug] || { views: 0, likes: 0 };
       var thumb = p.cover
         ? '<img class="post-row-thumb" src="' + esc(p.cover) + '" alt="" loading="lazy">'
         : '';
@@ -2590,6 +2789,9 @@
       var pinBadge = p.pinned ? '<span class="badge badge-pink">📌 置顶</span>' : '';
       var draftBadge = p.draft ? '<span class="badge badge-draft">草稿</span>' : '<span class="badge">已发布</span>';
       var toggleLabel = p.draft ? '立即发布' : '转草稿';
+      var viewBtn = p.draft
+        ? '<a class="btn btn-soft btn-sm" href="/post/' + esc(p.slug) + '/" target="_blank" title="以已登录博主身份预览真实前台效果">👁️ 预览</a>'
+        : '<a class="btn btn-sm" href="/post/' + esc(p.slug) + '/" target="_blank">查看</a>';
       return (
         '<div class="post-row">' +
           thumb +
@@ -2598,13 +2800,14 @@
             '<div class="post-row-meta">' +
               pinBadge + draftBadge + catBadge +
               '<span>' + esc(p.date) + '</span>' +
+              '<span>👁 ' + (st.views || 0) + ' · ♥ ' + (st.likes || 0) + '</span>' +
               '<span>/' + esc(p.slug) + '</span>' +
             '</div>' +
           '</div>' +
           '<div class="post-row-ops">' +
             '<button class="btn btn-soft btn-sm" type="button" data-edit-post="' + esc(p.slug) + '">编辑</button>' +
             '<button class="btn btn-sm" type="button" data-toggle-draft="' + esc(p.slug) + '">' + toggleLabel + '</button>' +
-            (p.draft ? '' : '<a class="btn btn-sm" href="/post/' + esc(p.slug) + '/" target="_blank">查看</a>') +
+            viewBtn +
             '<button class="btn btn-danger btn-sm" type="button" data-del-post="' + esc(p.slug) + '" data-post-title="' + esc(p.title) + '">删除</button>' +
           '</div>' +
         '</div>'
@@ -2614,6 +2817,10 @@
 
   if (postsSearch) postsSearch.addEventListener('input', renderPosts);
   if (postsCatFilter) postsCatFilter.addEventListener('change', renderPosts);
+  if (postsSort) postsSort.addEventListener('change', function () {
+    state.postSort = postsSort.value || 'default';
+    renderPosts();
+  });
   document.querySelectorAll('.filter-pill[data-post-status]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       state.postFilterStatus = btn.getAttribute('data-post-status') || 'all';
@@ -2938,6 +3145,9 @@
     if (sBannerUrl && sBannerUrl.value) candidates.push(sBannerUrl.value.trim());
     (state.posts || []).forEach(function (p) { if (p && p.cover) candidates.push(p.cover); });
     (state.gallery || []).forEach(function (g) { if (g && g.url) candidates.push(g.url); });
+    (state.moments || []).forEach(function (m) {
+      if (m && Array.isArray(m.images)) m.images.forEach(function (im) { if (im) candidates.push(im); });
+    });
     for (var i = 0; i < candidates.length; i++) {
       var u = candidates[i];
       if (u && u.split('?')[0] === baseUrl && extractOrigUrl(u)) return u;
@@ -3608,6 +3818,301 @@
   });
   saveBgmBtn.addEventListener('click', saveBgmNow);
 
+  /* =========================================================
+     Moments / 碎碎念 Quick Composer & Timeline Manager
+     ========================================================= */
+  var momComposeBox = document.getElementById('mom-compose-box');
+  var momText = document.getElementById('mom-text');
+  var momMood = document.getElementById('mom-mood');
+  var momPinned = document.getElementById('mom-pinned');
+  var momImgsPreview = document.getElementById('mom-imgs-preview');
+  var momImgBtn = document.getElementById('mom-img-btn');
+  var momImgFiles = document.getElementById('mom-img-files');
+  var momStatus = document.getElementById('mom-status');
+  var momSubmitBtn = document.getElementById('mom-submit-btn');
+  var momCancelEditBtn = document.getElementById('mom-cancel-edit-btn');
+  var momAdminList = document.getElementById('mom-admin-list');
+
+  function nowDateTimeStr() {
+    var d = new Date();
+    return todayStr() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  function syncMoodChips() {
+    var cur = (momMood ? momMood.value : '').trim();
+    document.querySelectorAll('.mood-chip[data-mood-pick]').forEach(function (b) {
+      b.classList.toggle('is-active', b.getAttribute('data-mood-pick') === cur);
+    });
+  }
+
+  function renderMomImgsPreview() {
+    if (momImgBtn) momImgBtn.textContent = '🖼️ 配图 (' + state.momImgs.length + '/9)';
+    if (!momImgsPreview) return;
+    if (!state.momImgs.length) {
+      momImgsPreview.classList.add('hidden');
+      momImgsPreview.innerHTML = '';
+      return;
+    }
+    momImgsPreview.classList.remove('hidden');
+    momImgsPreview.innerHTML = state.momImgs.map(function (u, idx) {
+      return (
+        '<div class="mom-thumb-item">' +
+          '<img src="' + esc(u) + '" alt="" loading="lazy">' +
+          '<button type="button" class="mom-thumb-rm" data-mom-rmimg="' + idx + '" title="移除图片">✕</button>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function resetMomentComposer() {
+    state.editingMomentId = '';
+    state.momImgs = [];
+    if (momText) momText.value = '';
+    if (momMood) momMood.value = '';
+    if (momPinned) momPinned.checked = false;
+    if (momStatus) momStatus.textContent = '';
+    if (momSubmitBtn) momSubmitBtn.textContent = '✦ 发布碎碎念';
+    if (momCancelEditBtn) momCancelEditBtn.classList.add('hidden');
+    syncMoodChips();
+    renderMomImgsPreview();
+  }
+
+  function saveMomentsList(nextList, toastMsg, onSuccess) {
+    if (momSubmitBtn) momSubmitBtn.disabled = true;
+    return api('POST', '/api/studio/moments', nextList)
+      .then(function () {
+        state.moments = nextList;
+        if (onSuccess) onSuccess();
+        renderMomentsAdmin();
+        if (toastMsg) showToast(toastMsg);
+      })
+      .catch(function (err) { showToast(esc(err.message), true); })
+      .finally(function () { if (momSubmitBtn) momSubmitBtn.disabled = false; });
+  }
+
+  function renderMomentsAdmin() {
+    if (cntMoments) cntMoments.textContent = String(state.moments.length);
+    if (!momAdminList) return;
+    if (!state.moments.length) {
+      momAdminList.innerHTML = '<p class="field-hint" style="text-align:center;padding:18px 0">还没有发过碎碎念～ 在上方输入框随手记录今天的小确幸吧 ✦</p>';
+      return;
+    }
+    momAdminList.innerHTML = state.moments.map(function (m, idx) {
+      var imgs = Array.isArray(m.images) ? m.images : [];
+      var imgHtml = imgs.length
+        ? '<div class="mom-row-imgs">' + imgs.map(function (u) {
+            return '<a href="' + esc(extractOrigUrl(u) || u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" loading="lazy"></a>';
+          }).join('') + '</div>'
+        : '';
+      return (
+        '<div class="mom-row" data-mom-idx="' + idx + '">' +
+          '<div class="mom-row-head">' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+              (m.pinned ? '<span class="badge badge-pink">📌 置顶</span>' : '') +
+              (m.mood ? '<span class="badge badge-lilac">' + esc(m.mood) + '</span>' : '') +
+              '<span class="field-hint">' + esc(m.date || '') + '</span>' +
+            '</div>' +
+            '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+              '<button class="btn btn-sm" type="button" data-mom-act="pin">' + (m.pinned ? '取消置顶' : '📌 置顶') + '</button>' +
+              '<button class="btn btn-soft btn-sm" type="button" data-mom-act="edit">编辑</button>' +
+              '<button class="btn btn-danger btn-sm" type="button" data-mom-act="del">删除</button>' +
+            '</div>' +
+          '</div>' +
+          (m.text ? '<p class="mom-row-text">' + esc(m.text) + '</p>' : '') +
+          imgHtml +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function handleMomentImgUpload(fileList) {
+    var remain = 9 - state.momImgs.length;
+    if (remain <= 0) { showToast('每条碎碎念最多配 9 张图哦～', true); return; }
+    var imgs = Array.prototype.slice.call(fileList || []).filter(function (f) {
+      return f && f.type && f.type.indexOf('image/') === 0;
+    }).slice(0, remain);
+    if (!imgs.length) return;
+    momStatus.textContent = '正在上传 ' + imgs.length + ' 张配图...';
+    var chain = Promise.resolve();
+    imgs.forEach(function (file, idx) {
+      chain = chain.then(function () {
+        momStatus.textContent = '上传配图 (' + (idx + 1) + '/' + imgs.length + ')...';
+        return uploadImageFile(file).then(function (url) {
+          state.momImgs.push(url);
+          renderMomImgsPreview();
+        });
+      });
+    });
+    chain
+      .then(function () { momStatus.textContent = '配图已就绪 ✦'; })
+      .catch(function (err) {
+        momStatus.textContent = '';
+        showToast(esc(err.message), true);
+      });
+  }
+
+  function submitMoment() {
+    var txt = (momText.value || '').trim();
+    if (!txt && !state.momImgs.length) {
+      showToast('写点文字或配一张图片再发送吧～', true);
+      if (momText) momText.focus();
+      return;
+    }
+    var mood = (momMood.value || '').trim();
+    var pinned = !!(momPinned && momPinned.checked);
+    var nextList = state.moments.map(function (it) { return Object.assign({}, it); });
+    if (state.editingMomentId) {
+      var found = nextList.find(function (m) { return m && m.id === state.editingMomentId; });
+      if (found) {
+        found.text = txt;
+        found.mood = mood;
+        found.pinned = pinned;
+        found.images = state.momImgs.slice(0, 9);
+      }
+      saveMomentsList(nextList, '碎碎念修改已保存 ✦ <a href="/moments/" target="_blank">立即查看 ↗</a>', resetMomentComposer);
+    } else {
+      nextList.unshift({
+        id: 'm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        text: txt,
+        images: state.momImgs.slice(0, 9),
+        mood: mood,
+        date: nowDateTimeStr(),
+        pinned: pinned
+      });
+      saveMomentsList(nextList, '碎碎念发布成功 ✦ <a href="/moments/" target="_blank">查看动态页 ↗</a>', resetMomentComposer);
+    }
+  }
+
+  document.querySelectorAll('.mood-chip[data-mood-pick]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var val = btn.getAttribute('data-mood-pick') || '';
+      momMood.value = (momMood.value.trim() === val) ? '' : val;
+      syncMoodChips();
+    });
+  });
+  if (momMood) momMood.addEventListener('input', syncMoodChips);
+  if (momImgBtn) momImgBtn.addEventListener('click', function () { momImgFiles.click(); });
+  if (momImgFiles) momImgFiles.addEventListener('change', function () {
+    handleMomentImgUpload(momImgFiles.files);
+    momImgFiles.value = '';
+  });
+  if (momImgsPreview) momImgsPreview.addEventListener('click', function (e) {
+    var rm = e.target.closest('[data-mom-rmimg]');
+    if (!rm) return;
+    state.momImgs.splice(parseInt(rm.getAttribute('data-mom-rmimg'), 10), 1);
+    renderMomImgsPreview();
+  });
+  if (momComposeBox) {
+    momComposeBox.addEventListener('dragover', function (e) { e.preventDefault(); momComposeBox.classList.add('is-drag'); });
+    momComposeBox.addEventListener('dragleave', function () { momComposeBox.classList.remove('is-drag'); });
+    momComposeBox.addEventListener('drop', function (e) {
+      e.preventDefault();
+      momComposeBox.classList.remove('is-drag');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+        handleMomentImgUpload(e.dataTransfer.files);
+      }
+    });
+  }
+  if (momText) {
+    momText.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        submitMoment();
+      }
+    });
+    momText.addEventListener('paste', function (e) {
+      if (!e.clipboardData || !e.clipboardData.items) return;
+      var files = [];
+      for (var i = 0; i < e.clipboardData.items.length; i++) {
+        var it = e.clipboardData.items[i];
+        if (it.kind === 'file' && it.type && it.type.indexOf('image/') === 0) {
+          var f = it.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (files.length) {
+        e.preventDefault();
+        handleMomentImgUpload(files);
+      }
+    });
+  }
+  if (momSubmitBtn) momSubmitBtn.addEventListener('click', submitMoment);
+  if (momCancelEditBtn) momCancelEditBtn.addEventListener('click', function () {
+    resetMomentComposer();
+    showToast('已取消编辑');
+  });
+  if (momAdminList) {
+    momAdminList.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-mom-act]');
+      var row = e.target.closest('[data-mom-idx]');
+      if (!btn || !row) return;
+      var i = parseInt(row.getAttribute('data-mom-idx'), 10);
+      var m = state.moments[i];
+      if (!m) return;
+      var act = btn.getAttribute('data-mom-act');
+      if (act === 'pin') {
+        var nextPin = !m.pinned;
+        var nextListP = state.moments.map(function (it, idx) {
+          return idx === i ? Object.assign({}, it, { pinned: nextPin }) : it;
+        });
+        saveMomentsList(nextListP, nextPin ? '已置顶该条碎碎念 📌' : '已取消置顶');
+      } else if (act === 'edit') {
+        state.editingMomentId = m.id;
+        state.momImgs = Array.isArray(m.images) ? m.images.slice(0, 9) : [];
+        momText.value = m.text || '';
+        momMood.value = m.mood || '';
+        momPinned.checked = !!m.pinned;
+        momSubmitBtn.textContent = '✦ 保存修改';
+        momCancelEditBtn.classList.remove('hidden');
+        syncMoodChips();
+        renderMomImgsPreview();
+        momText.focus();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (act === 'del') {
+        if (!confirm('确定删除这条碎碎念吗？')) return;
+        var nextListD = state.moments.filter(function (_, idx) { return idx !== i; });
+        var wasEditing = (state.editingMomentId === m.id);
+        saveMomentsList(nextListD, '碎碎念已删除（配图保留在媒体库）', wasEditing ? resetMomentComposer : null);
+      }
+    });
+  }
+
+  /* =========================================================
+     One-Click Full Site Backup Download (.tar)
+     ========================================================= */
+  var backupDownloadBtn = document.getElementById('backup-download-btn');
+  var backupStatus = document.getElementById('backup-status');
+  if (backupDownloadBtn) {
+    backupDownloadBtn.addEventListener('click', function () {
+      backupDownloadBtn.disabled = true;
+      if (backupStatus) backupStatus.textContent = '正在实时打包整站数据...';
+      fetch('/api/studio/backup', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) {
+          if (r.status === 401) { showGate(); throw new Error('登录已过期，请重新解锁'); }
+          if (!r.ok) throw new Error('打包失败 (' + r.status + ')');
+          return r.blob();
+        })
+        .then(function (blob) {
+          var fname = 'asmblog-backup-' + todayStr() + '.tar';
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = fname;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+          if (backupStatus) backupStatus.textContent = '已导出 ' + fmtBytes(blob.size) + ' ✦';
+          showToast('整站备份已开始下载（' + esc(fname) + ' · ' + fmtBytes(blob.size) + '）✦');
+        })
+        .catch(function (err) {
+          if (backupStatus) backupStatus.textContent = '';
+          showToast(esc(err.message), true);
+        })
+        .finally(function () { backupDownloadBtn.disabled = false; });
+    });
+  }
+
   function refreshAll() {
     return Promise.all([
       api('GET', '/api/studio/posts'),
@@ -3616,7 +4121,9 @@
       fetch('/gallery.json', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return []; }),
       fetch('/about.json', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return {}; }),
       fetch('/bgm.json', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return []; }),
-      api('GET', '/api/studio/media').catch(function () { return []; })
+      api('GET', '/api/studio/media').catch(function () { return []; }),
+      fetch('/moments.json', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return []; }),
+      fetch('/api/stats', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).catch(function () { return {}; })
     ]).then(function (res) {
       state.posts = Array.isArray(res[0]) ? res[0] : [];
       state.cats = Array.isArray(res[1]) ? res[1] : [];
@@ -3630,11 +4137,19 @@
       };
       state.bgm = Array.isArray(res[5]) ? res[5] : [];
       state.media = Array.isArray(res[6]) ? res[6] : [];
+      state.moments = Array.isArray(res[7]) ? res[7] : [];
+      var stObj = (res[8] && typeof res[8] === 'object') ? res[8] : {};
+      state.statsTotal = { views: stObj.total_views || 0, likes: stObj.total_likes || 0 };
+      state.statsMap = {};
+      (Array.isArray(stObj.items) ? stObj.items : []).forEach(function (it) {
+        if (it && it.slug) state.statsMap[it.slug] = { views: it.views || 0, likes: it.likes || 0 };
+      });
       setBtnDirty(saveGalleryBtn, SAVE_GAL_LABEL, false);
       setBtnDirty(saveAboutBtn, SAVE_ABOUT_LABEL, false);
       setBtnDirty(saveBgmBtn, SAVE_BGM_LABEL, false);
       renderPosts();
       renderCats();
+      renderMomentsAdmin();
       renderGalleryAdmin();
       renderAboutAdmin();
       renderBgmAdmin();

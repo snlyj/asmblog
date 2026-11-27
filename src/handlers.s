@@ -118,6 +118,8 @@ k_category:      .ascii "category"
 .equ k_category_len, . - k_category
 k_pinned:        .ascii "pinned"
 .equ k_pinned_len, . - k_pinned
+k_is_draft:      .ascii "is_draft"
+.equ k_is_draft_len, . - k_is_draft
 s_one_lit:       .ascii "1"
 k_query:         .ascii "query"
 .equ k_query_len, . - k_query
@@ -152,6 +154,8 @@ tpl_gallery:     .ascii "gallery"
 .equ tpl_gallery_len, . - tpl_gallery
 tpl_about:       .ascii "about"
 .equ tpl_about_len, . - tpl_about
+tpl_moments:     .ascii "moments"
+.equ tpl_moments_len, . - tpl_moments
 tpl_404:         .ascii "404"
 .equ tpl_404_len, . - tpl_404
 
@@ -167,15 +171,20 @@ s_gallery_title: .ascii "精选画廊"
 .equ s_gallery_title_len, . - s_gallery_title
 s_about_title:   .ascii "关于与友链"
 .equ s_about_title_len, . - s_about_title
+s_moments_title: .ascii "碎碎念"
+.equ s_moments_title_len, . - s_moments_title
 s_404_title:     .ascii "404 Not Found"
 .equ s_404_title_len, . - s_404_title
 p_gallery_json:  .asciz "content/gallery.json"
 p_about_json:    .asciz "content/about.json"
 p_bgm_json:      .asciz "content/bgm.json"
+p_moments_json:  .asciz "content/moments.json"
 s_og_gallery:    .ascii "/gallery/"
 .equ s_og_gallery_len, . - s_og_gallery
 s_og_about:      .ascii "/about/"
 .equ s_og_about_len, . - s_og_about
+s_og_moments:    .ascii "/moments/"
+.equ s_og_moments_len, . - s_og_moments
 j_empty_arr:     .ascii "[]"
 j_empty_obj:     .ascii "{}"
 s_page_pre:      .ascii "/page/"
@@ -673,6 +682,14 @@ bind_post_vars:
     mov ecx, 1
 .Lbpv_pin:
     lea rdi, [rip + k_pinned];   mov esi, k_pinned_len;   call ctx_set
+    xor edx, edx
+    xor ecx, ecx
+    cmp qword ptr [r12 + POST_DRAFT], 0
+    je .Lbpv_draft
+    lea rdx, [rip + s_one_lit]
+    mov ecx, 1
+.Lbpv_draft:
+    lea rdi, [rip + k_is_draft]; mov esi, k_is_draft_len; call ctx_set
 
     mov rdi, [r12 + POST_READ_MIN]
     mov esi, 2
@@ -1536,6 +1553,10 @@ render_sitemap_xml:
     mov rdi, rsp; lea rsi, [rip + g_cfg_site_url]; mov rdx, [rip + g_cfg_site_url_len]; call sb_esc_html
     mov rdi, rsp; lea rsi, [rip + s_og_about]; mov edx, s_og_about_len; call sb_mem
     mov rdi, rsp; lea rsi, [rip + sm_u2]; mov edx, sm_u2_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + sm_u1]; mov edx, sm_u1_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + g_cfg_site_url]; mov rdx, [rip + g_cfg_site_url_len]; call sb_esc_html
+    mov rdi, rsp; lea rsi, [rip + s_og_moments]; mov edx, s_og_moments_len; call sb_mem
+    mov rdi, rsp; lea rsi, [rip + sm_u2]; mov edx, sm_u2_len; call sb_mem
 
     xor ebx, ebx
 .Lsm_loop:
@@ -1629,10 +1650,32 @@ handle_page:
 .globl handle_post
 handle_post:
     push r12
+    push r13
+    sub rsp, 8            # 2 pushes + ret = 24, +8 = 32 (16B aligned)
     mov r12, rdi
-    mov rdi, [rsi + REQ_PARAM_PTR]
-    mov rsi, [rsi + REQ_PARAM_LEN]
+    mov r13, rsi
+    mov rdi, [r13 + REQ_PARAM_PTR]
+    mov rsi, [r13 + REQ_PARAM_LEN]
     xor edx, edx
+    call store_find_post
+    test rax, rax
+    jz .Lhpo_try_draft
+    mov rdi, rax
+    mov rsi, rdx
+    call render_post_page
+    mov rdi, r12
+    mov rsi, rax
+    call send_html_200
+    jmp .Lhpo_ret
+.Lhpo_try_draft:
+    # Logged-in Studio author can live-preview draft posts (strictly no-store; guests still get 404!)
+    mov rdi, r13
+    call studio_is_authed
+    test eax, eax
+    jz .Lhpo_404
+    mov rdi, [r13 + REQ_PARAM_PTR]
+    mov rsi, [r13 + REQ_PARAM_LEN]
+    mov edx, 1
     call store_find_post
     test rax, rax
     jz .Lhpo_404
@@ -1641,13 +1684,16 @@ handle_post:
     call render_post_page
     mov rdi, r12
     mov rsi, rax
-    call send_html_200
-    pop r12
-    ret
+    lea rcx, [rip + ct_html]
+    call send_200_ct_nocache
+    jmp .Lhpo_ret
 .Lhpo_404:
     mov rdi, r12
     xor esi, esi
     call handle_not_found
+.Lhpo_ret:
+    add rsp, 8
+    pop r13
     pop r12
     ret
 
@@ -1795,6 +1841,13 @@ render_about_page:
     lea r8,  [rip + tpl_about];     mov r9d, tpl_about_len
     jmp render_simple_page
 
+.globl render_moments_page
+render_moments_page:
+    lea rdi, [rip + s_moments_title]; mov esi, s_moments_title_len
+    lea rdx, [rip + s_og_moments];    mov ecx, s_og_moments_len
+    lea r8,  [rip + tpl_moments];     mov r9d, tpl_moments_len
+    jmp render_simple_page
+
 .globl handle_gallery
 handle_gallery:
     push r12
@@ -1811,6 +1864,17 @@ handle_about:
     push r12
     mov r12, rdi
     call render_about_page
+    mov rdi, r12
+    mov rsi, rax
+    call send_html_200
+    pop r12
+    ret
+
+.globl handle_moments
+handle_moments:
+    push r12
+    mov r12, rdi
+    call render_moments_page
     mov rdi, r12
     mov rsi, rax
     call send_html_200
@@ -1866,6 +1930,13 @@ handle_about_json:
 .globl handle_bgm_json
 handle_bgm_json:
     lea rsi, [rip + p_bgm_json]
+    lea rdx, [rip + j_empty_arr]
+    mov ecx, 2
+    jmp serve_content_json
+
+.globl handle_moments_json
+handle_moments_json:
+    lea rsi, [rip + p_moments_json]
     lea rdx, [rip + j_empty_arr]
     mov ecx, 2
     jmp serve_content_json
