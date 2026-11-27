@@ -11,18 +11,84 @@
   var backTop = document.getElementById('back-top');
 
   var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var mobileMQ = window.matchMedia && window.matchMedia('(max-width: 680px)');
+  var saveData = !!(navigator.connection && navigator.connection.saveData);
   var RING_CIRC = 119.38;
   var prefetchCache = new Map();
+  var jsonCache = new Map();
   var searchIndexCache = null;
+  var searchIndexPromise = null;
   var isNavigating = false;
+  var navSeq = 0;
   var loaderTimer = null;
+  var loaderDelayTimer = null;
+
+  function runWhenIdle(fn, timeoutMs) {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(fn, { timeout: timeoutMs || 600 });
+    } else {
+      setTimeout(fn, 90);
+    }
+  }
+
+  function fetchJsonCached(url, ttlMs, fetchOpts) {
+    var now = Date.now();
+    var ttl = typeof ttlMs === 'number' ? ttlMs : 30000;
+    var entry = jsonCache.get(url);
+    if (entry) {
+      if (entry.data !== undefined && (now - entry.ts) < ttl) {
+        return Promise.resolve(entry.data);
+      }
+      if (entry.promise) return entry.promise;
+    }
+    var p = fetch(url, fetchOpts || undefined)
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        jsonCache.set(url, { ts: Date.now(), data: data, promise: null });
+        return data;
+      })
+      .catch(function (err) {
+        var cur = jsonCache.get(url);
+        if (cur && cur.promise === p) jsonCache.delete(url);
+        throw err;
+      });
+    jsonCache.set(url, { ts: now, data: entry ? entry.data : undefined, promise: p });
+    return p;
+  }
+
+  function patchStatsCache(slug, d) {
+    if (!slug || !d || typeof d !== 'object') return;
+    var entry = jsonCache.get('/api/stats');
+    if (!entry || !entry.data || !Array.isArray(entry.data.items)) return;
+    var items = entry.data.items;
+    var found = false;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i] && items[i].slug === slug) {
+        if (typeof d.views === 'number') items[i].views = d.views;
+        if (typeof d.likes === 'number') items[i].likes = d.likes;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      items.push({ slug: slug, views: d.views || 0, likes: d.likes || 0 });
+    }
+    entry.ts = Date.now();
+  }
 
   /* ---------------------------------------------------------
      1. Zero-Reflow GPU Scroll Progress + SVG Ring + TOC Spy (Single RAF)
      --------------------------------------------------------- */
   var maxScroll = 1;
   var scrollTicking = false;
+  var metricsRaf = 0;
+  var resizeRaf = 0;
+  var lastScrollRatio = -1;
   var backTopShown = false;
+  var fabsEl = null;
   var fabsShown = false;
   var tocEntries = [];
   var activeTocId = '';
@@ -105,34 +171,57 @@
   }
 
   function recalcMetrics() {
+    metricsRaf = 0;
     maxScroll = Math.max(1, root.scrollHeight - window.innerHeight);
+    lastScrollRatio = -1;
     recalcTocOffsets();
     paintScroll();
+  }
+
+  function scheduleMetrics() {
+    if (!metricsRaf) {
+      metricsRaf = requestAnimationFrame(recalcMetrics);
+    }
   }
 
   function paintScroll() {
     scrollTicking = false;
     var y = window.scrollY || root.scrollTop || 0;
     var ratio = Math.min(1, Math.max(0, y / maxScroll));
-    if (progressFill) {
-      progressFill.style.transform = 'scaleX(' + ratio.toFixed(4) + ')';
+    var ratioChanged = Math.abs(ratio - lastScrollRatio) >= 0.0005;
+    if (ratioChanged) {
+      lastScrollRatio = ratio;
+      if (progressFill) {
+        progressFill.style.transform = 'scaleX(' + ratio.toFixed(4) + ')';
+      }
     }
-    if (ringProgress) {
-      ringProgress.style.strokeDashoffset = (RING_CIRC * (1 - ratio)).toFixed(2);
-    }
+    var backTopJustShown = false;
     if (backTop) {
       var shouldShow = y > 340;
       if (shouldShow !== backTopShown) {
         backTopShown = shouldShow;
+        backTopJustShown = shouldShow;
         backTop.classList.toggle('is-shown', shouldShow);
       }
     }
-    var fabs = document.getElementById('article-fabs');
-    if (fabs) {
+    if (ringProgress && backTopShown && (ratioChanged || backTopJustShown)) {
+      ringProgress.style.strokeDashoffset = (RING_CIRC * (1 - ratio)).toFixed(2);
+    }
+    if (fabsEl && fabsEl.isConnected) {
       var showFabs = y > 260;
-      if (showFabs !== fabsShown || fabs.classList.contains('is-shown') !== showFabs) {
+      if (showFabs !== fabsShown) {
         fabsShown = showFabs;
-        fabs.classList.toggle('is-shown', showFabs);
+        fabsEl.classList.toggle('is-shown', showFabs);
+      }
+    }
+    if (activeResumeSlug) {
+      if (resumePillShown && y > 180) hideResumePill();
+      if (y > 120) {
+        clearTimeout(resumeSaveTimer);
+        var rsl = activeResumeSlug;
+        resumeSaveTimer = setTimeout(function () {
+          if (activeResumeSlug === rsl) saveReadPosNow(rsl);
+        }, 900);
       }
     }
     syncTocActive(y);
@@ -147,11 +236,16 @@
 
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', function () {
-    recalcMetrics();
-    updateNavState();
-    syncCatBarFade();
+    if (resizeRaf) return;
+    resizeRaf = requestAnimationFrame(function () {
+      resizeRaf = 0;
+      lastSliderEl = null;
+      recalcMetrics();
+      updateNavState();
+      syncCatBarFade();
+    });
   }, { passive: true });
-  window.addEventListener('load', recalcMetrics, { passive: true });
+  window.addEventListener('load', scheduleMetrics, { passive: true });
 
   if (backTop) {
     backTop.addEventListener('click', function () {
@@ -162,31 +256,45 @@
   /* ---------------------------------------------------------
      2. Dedicated Top PJAX Shimmer Loader (GPU scaleX + opacity)
      --------------------------------------------------------- */
-  function startLoader() {
+  function startLoader(delayMs) {
     if (!loader) return;
     clearTimeout(loaderTimer);
-    loader.classList.remove('is-done', 'is-loading');
-    loader.style.transform = 'scaleX(0)';
-    void loader.offsetWidth;
-    loader.classList.add('is-loading');
-    loader.style.transform = 'scaleX(0.74)';
+    clearTimeout(loaderDelayTimer);
+    var fire = function () {
+      loader.classList.remove('is-done', 'is-loading');
+      loader.style.transform = 'scaleX(0)';
+      requestAnimationFrame(function () {
+        if (!isNavigating) return;
+        loader.classList.add('is-loading');
+        loader.style.transform = 'scaleX(0.74)';
+      });
+    };
+    if (delayMs > 0) {
+      loaderDelayTimer = setTimeout(fire, delayMs);
+    } else {
+      fire();
+    }
   }
 
   function finishLoader() {
     if (!loader) return;
     clearTimeout(loaderTimer);
+    clearTimeout(loaderDelayTimer);
+    if (!loader.classList.contains('is-loading')) return;
     loader.classList.remove('is-loading');
     loader.classList.add('is-done');
     loader.style.transform = 'scaleX(1)';
     loaderTimer = setTimeout(function () {
       loader.classList.remove('is-done');
       loader.style.transform = 'scaleX(0)';
-    }, 380);
+    }, 340);
   }
 
   /* ---------------------------------------------------------
      3. Desktop Sliding Pill + Mobile Grid Active State
      --------------------------------------------------------- */
+  var lastSliderEl = null;
+
   function matchNavKey(pathname) {
     var p = pathname || window.location.pathname;
     if (p.indexOf('/moments') === 0) return '/moments';
@@ -198,14 +306,16 @@
     return '/';
   }
 
-  function moveSliderTo(el) {
+  function moveSliderTo(el, force) {
     if (!nav || !navSlider || !el) return;
-    if (window.getComputedStyle(navSlider).display === 'none') return;
+    if (mobileMQ && mobileMQ.matches) return;
+    if (!force && el === lastSliderEl) return;
     var navRect = nav.getBoundingClientRect();
     var rect = el.getBoundingClientRect();
     if (!rect.width) return;
+    lastSliderEl = el;
     navSlider.style.width = rect.width + 'px';
-    navSlider.style.transform = 'translateX(' + (rect.left - navRect.left) + 'px)';
+    navSlider.style.transform = 'translate3d(' + (rect.left - navRect.left).toFixed(1) + 'px, 0, 0)';
     navSlider.style.opacity = '1';
   }
 
@@ -218,13 +328,13 @@
       a.classList.toggle('is-active', on);
       if (on) active = a;
     });
-    if (active) moveSliderTo(active);
+    if (active) moveSliderTo(active, false);
   }
 
   if (nav) {
     nav.addEventListener('mouseover', function (e) {
       var a = e.target.closest('a[data-nav]');
-      if (a) moveSliderTo(a);
+      if (a) moveSliderTo(a, false);
     });
     nav.addEventListener('mouseleave', function () {
       updateNavState();
@@ -334,6 +444,8 @@
     if (e.button !== 0) return;
     if (e.target && e.target.closest && e.target.closest('#img-lightbox, #cmd-search, #toc-sheet, #bgm-dock')) return;
     var count = 5;
+    var frag = document.createDocumentFragment();
+    var nodes = [];
     for (var i = 0; i < count; i++) {
       var sp = document.createElement('span');
       sp.className = 'click-spark';
@@ -346,11 +458,15 @@
       sp.style.setProperty('--tx', (Math.cos(angle) * dist).toFixed(1) + 'px');
       sp.style.setProperty('--ty', (Math.sin(angle) * dist - 6).toFixed(1) + 'px');
       sp.style.setProperty('--rot', ((Math.random() - 0.5) * 120).toFixed(0) + 'deg');
-      document.body.appendChild(sp);
-      setTimeout(function (node) {
-        if (node && node.parentNode) node.parentNode.removeChild(node);
-      }, 680, sp);
+      frag.appendChild(sp);
+      nodes.push(sp);
     }
+    document.body.appendChild(frag);
+    setTimeout(function () {
+      for (var j = 0; j < nodes.length; j++) {
+        if (nodes[j].parentNode) nodes[j].parentNode.removeChild(nodes[j]);
+      }
+    }, 680);
   });
 
   function bindAvatarBoing() {
@@ -812,7 +928,14 @@
         }
       }
     });
-    document.querySelectorAll('.post-cover, .article-cover, .prose img').forEach(function (im) {
+    // Keep LCP .article-cover immediately visible (never fade from opacity:0!)
+    document.querySelectorAll('.article-cover').forEach(function (im) {
+      im.classList.remove('img-fade');
+      if (!im.complete) {
+        im.addEventListener('load', scheduleMetrics, { once: true });
+      }
+    });
+    document.querySelectorAll('.post-cover, .prose img').forEach(function (im) {
       if (im.complete && im.naturalWidth > 0) {
         im.classList.remove('img-fade');
         return;
@@ -820,7 +943,7 @@
       im.classList.add('img-fade');
       var done = function () {
         im.classList.add('is-loaded');
-        recalcMetrics();
+        scheduleMetrics();
       };
       im.addEventListener('load', done, { once: true });
       im.addEventListener('error', done, { once: true });
@@ -870,7 +993,7 @@
     if (reducedMotion || !stage) return;
     var items = stage.querySelectorAll('.reveal');
     items.forEach(function (el, idx) {
-      el.style.animationDelay = Math.min(idx * 35, 175) + 'ms';
+      el.style.animationDelay = Math.min(idx * 24, 120) + 'ms';
       el.classList.add('is-anim-in');
       el.addEventListener('animationend', function () {
         el.classList.remove('is-anim-in');
@@ -992,12 +1115,13 @@
       var label = sz === 'sm' ? '紧凑字号' : (sz === 'lg' ? '大字舒适模式' : '标准字号');
       showToast('已切换为' + label + ' ✦');
     }
-    requestAnimationFrame(recalcMetrics);
+    scheduleMetrics();
   }
 
   function initArticleExtras() {
     tocEntries = [];
     activeTocId = '';
+    fabsEl = null;
     fabsShown = false;
     closeTocSheet();
 
@@ -1139,6 +1263,7 @@
       }
       feed.appendChild(fabs);
     }
+    fabsEl = document.getElementById('article-fabs');
   }
 
   function initArchiveYears() {
@@ -1193,14 +1318,25 @@
   }
 
   function getSearchIndex(cb) {
-    if (searchIndexCache) { cb(searchIndexCache); return; }
-    fetch('/search-index.json')
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        searchIndexCache = Array.isArray(data) ? data : [];
-        cb(searchIndexCache);
-      })
-      .catch(function () {});
+    if (searchIndexCache) { if (cb) cb(searchIndexCache); return; }
+    if (!searchIndexPromise) {
+      searchIndexPromise = fetch('/search-index.json')
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          searchIndexCache = Array.isArray(data) ? data : [];
+          return searchIndexCache;
+        })
+        .catch(function (err) {
+          searchIndexPromise = null;
+          throw err;
+        });
+    }
+    searchIndexPromise.then(function (list) {
+      if (cb) cb(list);
+    }).catch(function () {});
   }
 
   function filterSearchPosts(list, q) {
@@ -1369,6 +1505,9 @@
   var quickSearchBtn = document.getElementById('quick-search-btn');
   if (quickSearchBtn) {
     quickSearchBtn.addEventListener('click', openCmdSearch);
+    var warmSearch = function () { getSearchIndex(); };
+    quickSearchBtn.addEventListener('pointerenter', warmSearch, { once: true, passive: true });
+    quickSearchBtn.addEventListener('focus', warmSearch, { once: true, passive: true });
   }
 
   function initSearch() {
@@ -1407,7 +1546,7 @@
       if (!q) {
         resultsBox.innerHTML = '';
         renderSuggestions(list);
-        recalcMetrics();
+        scheduleMetrics();
         return;
       }
       var hits = filterSearchPosts(list, q);
@@ -1416,7 +1555,7 @@
       }
       if (!hits.length) {
         resultsBox.innerHTML = '<div class="empty-state">没有找到与「' + esc(q) + '」相关的笔记呢，换个关键词试试吧～</div>';
-        recalcMetrics();
+        scheduleMetrics();
         return;
       }
       resultsBox.innerHTML = hits.map(function (p) {
@@ -1450,7 +1589,7 @@
         );
       }).join('');
       enhanceImages();
-      recalcMetrics();
+      scheduleMetrics();
     }
 
     function runSearch(q) {
@@ -1581,16 +1720,16 @@
     if (!grid || grid.dataset.galInit) return;
     grid.dataset.galInit = '1';
 
-    fetch('/gallery.json')
-      .then(function (r) { return r.json(); })
+    fetchJsonCached('/gallery.json', 45000)
       .then(function (data) {
+        if (!grid.isConnected) return;
         var all = (Array.isArray(data) ? data : []).filter(function (it) {
           return it && isSafeFrontUrl(it.url);
         });
         if (!all.length) {
           if (bar) bar.innerHTML = '';
           grid.innerHTML = '<div class="empty-state">画廊里还没有放进精选作品哦～ 博主可以在创作后台「🖼️ 精选画廊」亲自挑选美图放进来 ✦</div>';
-          recalcMetrics();
+          scheduleMetrics();
           return;
         }
 
@@ -1629,7 +1768,7 @@
             : all;
           if (!shown.length) {
             grid.innerHTML = '<div class="empty-state">这个分类下暂时没有精选作品～</div>';
-            recalcMetrics();
+            scheduleMetrics();
             return;
           }
           var lbItems = shown.map(function (it) {
@@ -1671,18 +1810,18 @@
           grid.querySelectorAll('.gal-img').forEach(function (im) {
             if (im.complete && im.naturalWidth > 0) return;
             im.classList.add('img-fade');
-            var done = function () { im.classList.add('is-loaded'); recalcMetrics(); };
+            var done = function () { im.classList.add('is-loaded'); scheduleMetrics(); };
             im.addEventListener('load', done, { once: true });
             im.addEventListener('error', done, { once: true });
           });
-          recalcMetrics();
+          scheduleMetrics();
         }
 
         renderBar();
         renderCards();
       })
       .catch(function () {
-        grid.innerHTML = '<div class="empty-state">画廊加载失败，请稍后刷新重试～</div>';
+        if (grid.isConnected) grid.innerHTML = '<div class="empty-state">画廊加载失败，请稍后刷新重试～</div>';
       });
   }
 
@@ -1693,9 +1832,9 @@
     if (!bioEl || !friendsGrid || bioEl.dataset.aboutInit) return;
     bioEl.dataset.aboutInit = '1';
 
-    fetch('/about.json')
-      .then(function (r) { return r.json(); })
+    fetchJsonCached('/about.json', 45000)
       .then(function (data) {
+        if (!bioEl.isConnected || !friendsGrid.isConnected) return;
         var cfg = (data && typeof data === 'object') ? data : {};
         var bio = String(cfg.bio || '').trim();
         if (bio) {
@@ -1733,7 +1872,7 @@
             var av = isSafeFrontUrl(f.avatar) ? f.avatar : '/static/avatar.webp?v=3&orig=/static/avatar.jpg';
             return (
               '<a class="friend-card" href="' + esc(f.url) + '" target="_blank" rel="noopener noreferrer">' +
-              '<img class="friend-avatar" src="' + esc(av) + '" alt="' + esc(f.name) + '" loading="lazy" decoding="async">' +
+              '<img class="friend-avatar" src="' + esc(av) + '" width="52" height="52" alt="' + esc(f.name) + '" loading="lazy" decoding="async">' +
               '<div class="friend-info">' +
               '<p class="friend-name">' + esc(f.name) + '</p>' +
               '<p class="friend-desc">' + esc(f.desc || f.url) + '</p>' +
@@ -1741,10 +1880,10 @@
             );
           }).join('');
         }
-        recalcMetrics();
+        scheduleMetrics();
       })
       .catch(function () {
-        friendsGrid.innerHTML = '<div class="empty-state">暂时未能读取关于与友链信息～</div>';
+        if (friendsGrid.isConnected) friendsGrid.innerHTML = '<div class="empty-state">暂时未能读取关于与友链信息～</div>';
       });
   }
 
@@ -1818,7 +1957,7 @@
           var tr = bgm.list[bgm.idx];
           titleEl.textContent = tr.title || ('曲目 ' + (bgm.idx + 1));
           artistEl.textContent = (tr.artist || 'BGM') + (bgm.list.length > 1 ? (' · ' + (bgm.idx + 1) + '/' + bgm.list.length) : '');
-          fillEl.style.width = '0%';
+          fillEl.style.transform = 'scaleX(0)';
           timeEl.textContent = '0:00 / 0:00';
           audio.src = tr.url;
           if (autoPlay) {
@@ -1875,7 +2014,8 @@
           var dur = audio.duration || 0;
           var cur = audio.currentTime || 0;
           if (dur > 0 && isFinite(dur)) {
-            fillEl.style.width = ((cur / dur) * 100).toFixed(2) + '%';
+            var r = Math.min(1, Math.max(0, cur / dur));
+            fillEl.style.transform = 'scaleX(' + r.toFixed(4) + ')';
             timeEl.textContent = fmtAudioTime(cur) + ' / ' + fmtAudioTime(dur);
           }
         });
@@ -1959,7 +2099,8 @@
         if (!isDraft && !alreadyViewed) {
           try { sessionStorage.setItem(viewKey, '1'); } catch (_) {}
         }
-        applyCounts(d);
+        patchStatsCache(slug, d);
+        if (art.isConnected) applyCounts(d);
       })
       .catch(function () {
         /* Gracefully stay hidden on static-only hosting */
@@ -1993,6 +2134,8 @@
           .then(function (d) {
             if (!d) return;
             try { localStorage.setItem(likeKey, '1'); } catch (_) {}
+            patchStatsCache(slug, d);
+            if (!art.isConnected) return;
             setLikedUI(true);
             applyCounts(d);
             likeBtn.classList.remove('is-popping');
@@ -2077,9 +2220,9 @@
     var avatar = feed.getAttribute('data-avatar') || '/static/avatar.webp?v=3&orig=/static/avatar.jpg';
     if (!isSafeFrontUrl(avatar)) avatar = '/static/avatar.webp?v=3&orig=/static/avatar.jpg';
 
-    fetch('/moments.json')
-      .then(function (r) { return r.json(); })
+    fetchJsonCached('/moments.json', 30000)
       .then(function (data) {
+        if (!feed.isConnected) return;
         var all = (Array.isArray(data) ? data : []).filter(function (m) {
           if (!m || typeof m !== 'object') return false;
           var hasTxt = String(m.text || '').trim().length > 0;
@@ -2093,7 +2236,7 @@
           if (bar) bar.innerHTML = '';
           if (moreWrap) moreWrap.innerHTML = '';
           feed.innerHTML = '<div class="empty-state">碎碎念还是空的～ 博主可以在创作后台「💬 碎碎念」随手发第一条动态 ✦</div>';
-          recalcMetrics();
+          scheduleMetrics();
           return;
         }
 
@@ -2145,7 +2288,7 @@
             return (
               '<article class="moment-card">' +
                 '<div class="moment-head">' +
-                  '<img class="moment-avatar" src="' + esc(avatar) + '" alt="' + esc(author) + '" loading="lazy" decoding="async">' +
+                  '<img class="moment-avatar" src="' + esc(avatar) + '" width="42" height="42" alt="' + esc(author) + '" loading="lazy" decoding="async">' +
                   '<div class="moment-meta">' +
                     '<div class="moment-author-row">' +
                       '<span class="moment-author">' + esc(author) + '</span>' +
@@ -2175,7 +2318,7 @@
           feed.querySelectorAll('.moment-photo-img').forEach(function (im) {
             if (im.complete && im.naturalWidth > 0) return;
             im.classList.add('img-fade');
-            var done = function () { im.classList.add('is-loaded'); recalcMetrics(); };
+            var done = function () { im.classList.add('is-loaded'); scheduleMetrics(); };
             im.addEventListener('load', done, { once: true });
             im.addEventListener('error', done, { once: true });
           });
@@ -2191,14 +2334,14 @@
               moreWrap.innerHTML = '';
             }
           }
-          recalcMetrics();
+          scheduleMetrics();
         }
 
         renderBar();
         renderFeed();
       })
       .catch(function () {
-        feed.innerHTML = '<div class="empty-state">碎碎念加载失败，请稍后刷新重试～</div>';
+        if (feed.isConnected) feed.innerHTML = '<div class="empty-state">碎碎念加载失败，请稍后刷新重试～</div>';
       });
   }
 
@@ -2207,9 +2350,9 @@
     var momBar = document.getElementById('home-moment-bar');
     if (momBar && !momBar.dataset.momBarInit) {
       momBar.dataset.momBarInit = '1';
-      fetch('/moments.json')
-        .then(function (r) { return r.ok ? r.json() : []; })
+      fetchJsonCached('/moments.json', 30000)
         .then(function (data) {
+          if (!momBar.isConnected) return;
           var list = (Array.isArray(data) ? data : []).filter(function (m) {
             if (!m || typeof m !== 'object') return false;
             var imgs = Array.isArray(m.images) ? m.images.filter(isSafeFrontUrl) : [];
@@ -2230,20 +2373,20 @@
               '<span class="home-moment-go">全部动态 →</span>' +
             '</a>';
           momBar.classList.remove('hidden');
-          recalcMetrics();
+          scheduleMetrics();
         })
         .catch(function () {});
     }
 
     var statSlots = Array.prototype.slice.call(document.querySelectorAll('[data-card-stats]'));
     if (statSlots.some(function (el) { return !el.dataset.statsDone; })) {
-      fetch('/api/stats', { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.json() : null; })
+      fetchJsonCached('/api/stats', 25000, { cache: 'no-store' })
         .then(function (data) {
           if (!data || !Array.isArray(data.items)) return;
           var bySlug = {};
           data.items.forEach(function (it) { if (it && it.slug) bySlug[it.slug] = it; });
           document.querySelectorAll('[data-card-stats]').forEach(function (el) {
+            if (!el.isConnected) return;
             el.dataset.statsDone = '1';
             var sl = el.getAttribute('data-card-stats') || '';
             var st = bySlug[sl];
@@ -2272,6 +2415,7 @@
       .filter(Boolean);
 
     getSearchIndex(function (list) {
+      if (!box.isConnected) return;
       var others = (Array.isArray(list) ? list : []).filter(function (p) {
         return p && p.slug && p.slug !== curSlug;
       });
@@ -2292,7 +2436,7 @@
         '<div class="related-head"><h2 class="related-heading">✨ 猜你也喜欢</h2></div>' +
         '<div class="related-grid">' + picked.map(function (p) {
           var thumb = (p.cover && isSafeFrontUrl(p.cover))
-            ? '<img class="related-thumb" src="' + esc(p.cover) + '" alt="' + esc(p.title) + '" loading="lazy" decoding="async">'
+            ? '<img class="related-thumb" src="' + esc(p.cover) + '" width="320" height="180" alt="' + esc(p.title) + '" loading="lazy" decoding="async">'
             : '';
           var meta = [p.category ? ('✦ ' + p.category) : '', p.date || ''].filter(Boolean).join(' · ');
           return (
@@ -2306,13 +2450,14 @@
           );
         }).join('') + '</div>';
       box.classList.remove('hidden');
-      recalcMetrics();
+      scheduleMetrics();
     });
   }
 
   /* Gentle Resume-Reading Memory for Long Articles (non-intrusive clickable pill) */
   var READPOS_KEY = 'asmblog-readpos-v1';
   var resumePillEl = null;
+  var resumePillShown = false;
   var resumeHideTimer = null;
   var resumeSaveTimer = null;
   var activeResumeSlug = '';
@@ -2325,9 +2470,9 @@
   }
   function saveReadPosNow(slug) {
     if (!slug) return;
-    var maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-    if (maxScroll < window.innerHeight * 1.15) return;
-    var pct = Math.round(((window.scrollY || 0) / maxScroll) * 100);
+    var ms = maxScroll > 1 ? maxScroll : Math.max(0, root.scrollHeight - window.innerHeight);
+    if (ms < window.innerHeight * 1.15) return;
+    var pct = Math.round(((window.scrollY || 0) / ms) * 100);
     var map = readPosMap();
     if (pct >= 15 && pct <= 88) {
       map[slug] = { pct: pct, y: Math.round(window.scrollY || 0), ts: Date.now() };
@@ -2343,6 +2488,7 @@
   }
   function hideResumePill() {
     clearTimeout(resumeHideTimer);
+    resumePillShown = false;
     if (resumePillEl) resumePillEl.classList.remove('is-shown');
   }
   function showResumePill(pct, targetY) {
@@ -2359,50 +2505,42 @@
       '<button type="button" class="resume-pill-x" aria-label="关闭">✕</button>';
     resumePillEl.querySelector('.resume-pill-go').addEventListener('click', function () {
       hideResumePill();
-      var maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      var maxY = maxScroll > 1 ? maxScroll : Math.max(0, root.scrollHeight - window.innerHeight);
       window.scrollTo({ top: Math.min(targetY, maxY), behavior: reducedMotion ? 'auto' : 'smooth' });
     });
     resumePillEl.querySelector('.resume-pill-x').addEventListener('click', hideResumePill);
     resumePillEl.classList.add('is-shown');
+    resumePillShown = true;
     clearTimeout(resumeHideTimer);
     resumeHideTimer = setTimeout(hideResumePill, 6500);
   }
   function initReadingResume() {
     hideResumePill();
+    clearTimeout(resumeSaveTimer);
     var art = document.querySelector('article[data-post-slug]');
     activeResumeSlug = art ? (art.getAttribute('data-post-slug') || '').trim() : '';
     if (!activeResumeSlug) return;
     if (art.querySelector('.draft-preview-banner')) { activeResumeSlug = ''; return; }
     var rec = readPosMap()[activeResumeSlug];
     if (rec && rec.pct >= 15 && rec.pct <= 88 && rec.y > 240 && (window.scrollY || 0) < 120) {
+      var slugSnapshot = activeResumeSlug;
       setTimeout(function () {
-        if (activeResumeSlug && (window.scrollY || 0) < 120) showResumePill(rec.pct, rec.y);
+        if (activeResumeSlug === slugSnapshot && (window.scrollY || 0) < 120) showResumePill(rec.pct, rec.y);
       }, 450);
     }
   }
-  window.addEventListener('scroll', function () {
-    if (!activeResumeSlug) return;
-    if ((window.scrollY || 0) > 180) hideResumePill();
-    clearTimeout(resumeSaveTimer);
-    var sl = activeResumeSlug;
-    resumeSaveTimer = setTimeout(function () {
-      if (activeResumeSlug === sl) saveReadPosNow(sl);
-    }, 900);
-  }, { passive: true });
   window.addEventListener('pagehide', function () {
     if (activeResumeSlug) saveReadPosNow(activeResumeSlug);
   });
 
-  function hydratePage(animate) {
+  function hydratePage(animate, deferNonCritical) {
     if (animate) animateStageCards();
     enhanceImages();
     enhanceVideos();
     enhanceCodeBlocks();
     initArticleExtras();
     initArticleStats();
-    initRelatedPosts();
     initReadingResume();
-    initHomeEnhancements();
     initArchiveYears();
     initComments();
     initGallery();
@@ -2413,7 +2551,16 @@
     initSearch();
     updateNavState();
     updateCatBarState();
-    requestAnimationFrame(recalcMetrics);
+    if (deferNonCritical) {
+      runWhenIdle(function () {
+        initHomeEnhancements();
+        initRelatedPosts();
+      }, 500);
+    } else {
+      initHomeEnhancements();
+      initRelatedPosts();
+    }
+    scheduleMetrics();
   }
 
   /* ---------------------------------------------------------
@@ -2441,19 +2588,25 @@
     var cached = prefetchCache.get(urlStr);
     if (cached && now - cached.ts < PREFETCH_TTL) return cached.promise;
     if (cached) prefetchCache.delete(urlStr);
+    var entry = { ts: now, promise: null, ready: false };
     var p = fetch(urlStr, { headers: { 'X-AsmBlog-PJAX': '1' } })
       .then(function (resp) {
         if (!resp.ok && resp.status !== 404) throw new Error('HTTP ' + resp.status);
         var ct = resp.headers.get('content-type') || '';
         if (ct.indexOf('text/html') === -1) throw new Error('Not HTML');
         return resp.text();
+      })
+      .then(function (html) {
+        entry.ready = true;
+        return html;
       });
+    entry.promise = p;
     // A failed (pre)fetch must never poison later navigations: evict it right away.
     p.catch(function () {
       var cur = prefetchCache.get(urlStr);
       if (cur && cur.promise === p) prefetchCache.delete(urlStr);
     });
-    prefetchCache.set(urlStr, { ts: now, promise: p });
+    prefetchCache.set(urlStr, entry);
     // Bounded LRU-ish eviction (Map keeps insertion order -> oldest first).
     while (prefetchCache.size > PREFETCH_MAX) {
       prefetchCache.delete(prefetchCache.keys().next().value);
@@ -2462,7 +2615,7 @@
   }
 
   document.addEventListener('pointerenter', function (e) {
-    if (!e.target || !e.target.closest) return;
+    if (saveData || !e.target || !e.target.closest) return;
     var a = e.target.closest('a');
     if (!isInternalPageLink(a)) return;
     var u = new URL(a.href, window.location.origin);
@@ -2502,11 +2655,18 @@
     closeTocSheet();
     closeCmdSearch();
     document.querySelectorAll('video').forEach(function (v) { try { v.pause(); } catch (_) {} });
-    if (!stage || isNavigating) {
+    if (!stage) {
       window.location.href = urlObj.href;
       return;
     }
     if (urlObj.pathname === window.location.pathname && urlObj.search === window.location.search) {
+      if (isNavigating) {
+        navSeq++;
+        isNavigating = false;
+        finishLoader();
+        stage.classList.remove('is-leaving');
+        updateNavState(window.location.pathname);
+      }
       if (typeof restoreY === 'number') {
         window.scrollTo(0, restoreY);
       } else if (urlObj.hash) {
@@ -2521,18 +2681,26 @@
     saveCurrentScroll(!!push);
     if (activeResumeSlug) saveReadPosNow(activeResumeSlug);
     hideResumePill();
+    var seq = ++navSeq;
     isNavigating = true;
     updateNavState(urlObj.pathname);
-    startLoader();
 
-    var leaveWait = new Promise(function (resolve) {
-      stage.classList.remove('is-entering');
-      stage.classList.add('is-leaving');
-      setTimeout(resolve, reducedMotion ? 10 : 140);
-    });
+    var cached = prefetchCache.get(urlObj.href);
+    var isWarm = !!(cached && cached.ready && (Date.now() - cached.ts) < PREFETCH_TTL);
+    if (!isWarm) startLoader(65);
+    else clearTimeout(loaderDelayTimer);
+
+    var leaveMs = reducedMotion ? 0 : (isWarm ? 50 : 75);
+    var leaveWait = leaveMs > 0
+      ? new Promise(function (resolve) {
+          stage.classList.add('is-leaving');
+          setTimeout(resolve, leaveMs);
+        })
+      : Promise.resolve();
 
     Promise.all([fetchHtml(urlObj.href), leaveWait])
       .then(function (results) {
+        if (seq !== navSeq) return;
         var html = results[0];
         var doc = new DOMParser().parseFromString(html, 'text/html');
         var nextStage = doc.getElementById('pjax-stage');
@@ -2548,30 +2716,35 @@
 
         if (typeof restoreY === 'number' && restoreY > 0) {
           window.scrollTo(0, restoreY);
-        } else if (urlObj.hash) {
-          var targetEl = document.querySelector(urlObj.hash);
-          if (targetEl) targetEl.scrollIntoView({ behavior: 'auto' });
-          else window.scrollTo(0, 0);
         } else {
           window.scrollTo(0, 0);
         }
 
-        stage.classList.remove('is-leaving');
-        void stage.offsetWidth;
-        stage.classList.add('is-entering');
-        setTimeout(function () { stage.classList.remove('is-entering'); }, 280);
-
         finishLoader();
         isNavigating = false;
-        hydratePage(true);
+        hydratePage(true, false);
+
+        if (reducedMotion) {
+          stage.classList.remove('is-leaving');
+        } else {
+          requestAnimationFrame(function () {
+            if (seq === navSeq) stage.classList.remove('is-leaving');
+          });
+        }
+
         if (typeof restoreY === 'number' && restoreY > 0) {
           requestAnimationFrame(function () {
+            if (seq !== navSeq) return;
             window.scrollTo(0, restoreY);
             paintScroll();
           });
+        } else if (urlObj.hash) {
+          var targetEl = document.querySelector(urlObj.hash);
+          if (targetEl) targetEl.scrollIntoView({ behavior: 'auto' });
         }
       })
       .catch(function () {
+        if (seq !== navSeq) return;
         finishLoader();
         isNavigating = false;
         window.location.href = urlObj.href;
@@ -2678,9 +2851,15 @@
   try {
     history.replaceState({ url: window.location.href, scrollY: window.scrollY || 0 }, '', window.location.href);
   } catch (_) {}
-  hydratePage(false);
-  initBgmPlayer();
+  hydratePage(false, true);
+  runWhenIdle(function () {
+    initBgmPlayer();
+    if (!saveData) getSearchIndex();
+  }, 800);
   if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(function () { updateNavState(); });
+    document.fonts.ready.then(function () {
+      lastSliderEl = null;
+      updateNavState();
+    });
   }
 })();

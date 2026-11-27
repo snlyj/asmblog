@@ -2716,6 +2716,7 @@
     return out;
   }
   function renderPreview() {
+    clearTimeout(previewTimer);
     var lines = (fContent.value || '').replace(/\r\n/g, '\n').split('\n');
     var html = [];
     var inCode = false;
@@ -2755,24 +2756,48 @@
     mdPreview.innerHTML = html.join('') || '<p style="color:var(--muted)">预览区为空，开始输入正文吧～</p>';
   }
 
+  var previewTimer = null;
+  var wordCountRaf = 0;
+  var previewScrollRaf = 0;
+  function schedulePreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(function () {
+      if (state.previewOn) renderPreview();
+    }, 80);
+  }
+  function scheduleWordCount() {
+    if (wordCountRaf) return;
+    wordCountRaf = requestAnimationFrame(function () {
+      wordCountRaf = 0;
+      updateWordCount();
+    });
+  }
+
   tbPreview.addEventListener('click', function () {
     state.previewOn = !state.previewOn;
     mdSplit.classList.toggle('show-preview', state.previewOn);
     mdPreview.classList.toggle('hidden', !state.previewOn);
     tbPreview.textContent = state.previewOn ? '👁️ 关闭预览' : '👁️ 开启预览';
-    if (state.previewOn) renderPreview();
+    if (state.previewOn) {
+      clearTimeout(previewTimer);
+      renderPreview();
+    }
   });
   fContent.addEventListener('input', function () {
-    updateWordCount();
-    if (state.previewOn) renderPreview();
+    scheduleWordCount();
+    if (state.previewOn) schedulePreview();
   });
   fContent.addEventListener('scroll', function () {
-    if (!state.previewOn) return;
-    var maxSrc = fContent.scrollHeight - fContent.clientHeight;
-    var maxDst = mdPreview.scrollHeight - mdPreview.clientHeight;
-    if (maxSrc > 0 && maxDst > 0) {
-      mdPreview.scrollTop = (fContent.scrollTop / maxSrc) * maxDst;
-    }
+    if (!state.previewOn || previewScrollRaf) return;
+    previewScrollRaf = requestAnimationFrame(function () {
+      previewScrollRaf = 0;
+      if (!state.previewOn) return;
+      var maxSrc = fContent.scrollHeight - fContent.clientHeight;
+      var maxDst = mdPreview.scrollHeight - mdPreview.clientHeight;
+      if (maxSrc > 0 && maxDst > 0) {
+        mdPreview.scrollTop = (fContent.scrollTop / maxSrc) * maxDst;
+      }
+    });
   }, { passive: true });
 
   /* Reset Editor for New Post */

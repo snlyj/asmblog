@@ -332,22 +332,22 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v19 = http_req("/static/sky-ribbon.css?v=19")
+        st_imm, hdrs_imm, css_v20 = http_req("/static/sky-ribbon.css?v=20")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v19)
-        for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
-            assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
-        for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b"visibility: hidden", b".draft-preview-banner", b".like-btn", b".moments-feed", b".moment-card", b".home-moment-bar", b".related-card", b".resume-pill", b".cmd-quick-row", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v20)
+        for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky", b"--surface-soft"):
+            assert forbidden not in css_rules, f"forbidden/broken CSS rule found: {forbidden!r}"
+        for required_css in (b"hover: hover", b"contain: layout style", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b"visibility: hidden", b".draft-preview-banner", b".like-btn", b".moments-feed", b".moment-card", b".home-moment-bar", b".related-card", b".resume-pill", b".cmd-quick-row", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
             assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v19 = http_req("/static/sky-ribbon.js?v=19")
+        st_js, _, js_v20 = http_req("/static/sky-ribbon.js?v=20")
         assert_eq(st_js, 200, "versioned static js 200")
-        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"initGallery", b"initAbout", b"initMoments", b"initArticleStats", b"initRelatedPosts", b"initReadingResume", b"initHomeEnhancements", b"formatRelativeTime", b"formatMomentText", b"syncThemeColor", b"initBgmPlayer", b"pauseBgm", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart"):
-            assert required_js in js_v19, f"missing expected UI JS feature: {required_js!r}"
-        st_mf, h_mf, b_mf = http_req("/static/manifest.json")
-        assert_eq(st_mf, 200, "GET /static/manifest.json")
-        assert "application/json" in h_mf.get("Content-Type", "") and json.loads(b_mf)["display"] == "standalone"
+        for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"initGallery", b"initAbout", b"initMoments", b"initArticleStats", b"initRelatedPosts", b"initReadingResume", b"initHomeEnhancements", b"formatRelativeTime", b"formatMomentText", b"syncThemeColor", b"initBgmPlayer", b"pauseBgm", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart", b"pointerenter", b"scheduleMetrics", b"runWhenIdle", b"fetchJsonCached", b"patchStatsCache", b"navSeq"):
+            assert required_js in js_v20, f"missing expected UI JS feature: {required_js!r}"
+        st_mf, h_mf, b_mf = http_req("/static/manifest.json?v=1")
+        assert_eq(st_mf, 200, "GET /static/manifest.json?v=1")
+        assert "application/json" in h_mf.get("Content-Type", "") and "immutable" in h_mf.get("Cache-Control", "") and json.loads(b_mf)["display"] == "standalone"
 
         _, _, sm_xml = http_req("/sitemap.xml")
         sm_txt = sm_xml.decode("utf-8")
