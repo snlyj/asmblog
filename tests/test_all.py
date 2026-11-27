@@ -195,12 +195,17 @@ def test_server():
             f"studio_pass_sha256 = {test_hash}\n"
         )
 
+    # Pre-seed content/stats.txt with CRLF, blank & malformed lines to test restart persistence parser!
+    stats_seed_path = os.path.join(SITE, "content/stats.txt")
+    with open(stats_seed_path, "wb") as sf:
+        sf.write(b"\r\nwelcome-to-asmblog 7 3\r\n../bad-slug 9 9\nx86-64-assembly-architecture 4 1\n")
+
     proc = subprocess.Popen(
         [BIN, "serve", "-d", SITE, "-c", tmp_cfg_path, "-p", str(PORT)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    temp_files = [tmp_cfg_path, tmp_cfg_path + ".tmp"]
+    temp_files = [tmp_cfg_path, tmp_cfg_path + ".tmp", stats_seed_path]
     try:
         # Wait for startup
         for _ in range(40):
@@ -326,19 +331,19 @@ def test_server():
         st_404, hd_404, _ = http_req("/does-not-exist", headers={"If-None-Match": "*"})
         assert_eq(st_404, 404, "404 must ignore If-None-Match")
 
-        st_imm, hdrs_imm, css_v17 = http_req("/static/sky-ribbon.css?v=17")
+        st_imm, hdrs_imm, css_v18 = http_req("/static/sky-ribbon.css?v=18")
         assert_eq(st_imm, 200, "versioned static css 200")
         assert "immutable" in hdrs_imm.get("Cache-Control", ""), f"expected immutable on versioned URL: {hdrs_imm}"
-        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v17)
+        css_rules = re.sub(rb"/\*[\s\S]*?\*/", b"", css_v18)
         for forbidden in (b"100dvh", b"backdrop-filter", b"filter: blur", b"position: sticky"):
             assert forbidden not in css_rules, f"forbidden jank CSS rule found: {forbidden!r}"
         for required_css in (b"hover: hover", b".lightbox", b".lightbox-badge", b".prose-video", b".pjax-loader", b".post-grid", b".pin-badge", b".gallery-masonry", b".about-hero-card", b".friends-grid", b".bgm-dock", b"visibility: hidden", b".draft-preview-banner", b".like-btn", b".moments-feed", b".moment-card", b".toc-desktop", b".toc-mobile", b".toc-sheet", b".article-fabs", b".cmd-modal", b".font-size-ctrl", b".sky-toast", b".search-hl", b".archive-year", b".comments-card"):
             assert required_css in css_rules, f"missing expected UI CSS rule: {required_css!r}"
 
-        st_js, _, js_v17 = http_req("/static/sky-ribbon.js?v=17")
+        st_js, _, js_v18 = http_req("/static/sky-ribbon.js?v=18")
         assert_eq(st_js, 200, "versioned static js 200")
         for required_js in (b"img-lightbox", b"extractOrigUrl", b"loadedOrigs", b"zoomLightboxAt", b"preloadAdjacent", b"enhanceVideos", b"initGallery", b"initAbout", b"initMoments", b"initArticleStats", b"formatMomentText", b"initBgmPlayer", b"pauseBgm", b"ring-progress", b"pjax-loader", b"initArticleExtras", b"initArchiveYears", b"initComments", b"syncGiscusTheme", b"setLightboxZoom", b"showToast", b"highlightText", b"openCmdSearch", b"openTocSheet", b"applyFontSize", b"scrollMemo", b"touchstart"):
-            assert required_js in js_v17, f"missing expected UI JS feature: {required_js!r}"
+            assert required_js in js_v18, f"missing expected UI JS feature: {required_js!r}"
 
         _, _, sm_xml = http_req("/sitemap.xml")
         sm_txt = sm_xml.decode("utf-8")
@@ -717,8 +722,8 @@ def test_server():
         abt_path = os.path.join(SITE, "content/about.json")
         bgm_path = os.path.join(SITE, "content/bgm.json")
         mom_path = os.path.join(SITE, "content/moments.json")
-        stats_path = os.path.join(SITE, "content/stats.txt")
-        temp_files.extend([gal_path, abt_path, bgm_path, mom_path, stats_path])
+        stats_path = stats_seed_path
+        temp_files.extend([gal_path, abt_path, bgm_path, mom_path])
 
         # 1) Curated Gallery save & public read (+ reject truncated/mismatched JSON)
         for ep, bad_j in [
@@ -774,24 +779,28 @@ def test_server():
         assert_eq(json.loads(http_req("/moments.json")[2])[0]["mood"], "✨ 日常", "GET /moments.json")
         assert "moments-feed" in http_req("/moments/")[2].decode("utf-8")
 
-        # 3c) Zero-Tracker Post Views & Heart Likes API (+ draft/nonexistent isolation)
+        # 3c) Zero-Tracker Post Views & Heart Likes API (including disk reload from pre-seeded stats.txt + 429 rate-limit!)
+        st_s0, _, bs0 = http_req("/api/stats/welcome-to-asmblog")
+        assert_eq(st_s0, 200, "GET pre-seeded stats")
+        assert_eq(json.loads(bs0), {"slug": "welcome-to-asmblog", "views": 7, "likes": 3}, "must load persisted stats.txt cleanly")
         st_v, hv, bv = http_req("/api/stats/view", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "welcome-to-asmblog"}).encode())
         assert_eq(st_v, 200, "POST /api/stats/view")
         assert "no-store" in hv.get("Cache-Control", "")
-        assert_eq(json.loads(bv), {"slug": "welcome-to-asmblog", "views": 1, "likes": 0}, "view count=1")
+        assert_eq(json.loads(bv), {"slug": "welcome-to-asmblog", "views": 8, "likes": 3}, "view count=8")
         st_l, _, bl = http_req("/api/stats/like", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "welcome-to-asmblog"}).encode())
         assert_eq(st_l, 200, "POST /api/stats/like")
-        assert_eq(json.loads(bl), {"slug": "welcome-to-asmblog", "views": 1, "likes": 1}, "like count=1")
+        assert_eq(json.loads(bl), {"slug": "welcome-to-asmblog", "views": 8, "likes": 4}, "like count=4")
         st_s1, _, bs1 = http_req("/api/stats/welcome-to-asmblog")
         assert_eq(st_s1, 200, "GET /api/stats/:slug")
-        assert_eq(json.loads(bs1), {"slug": "welcome-to-asmblog", "views": 1, "likes": 1}, "GET stats must not increment")
+        assert_eq(json.loads(bs1), {"slug": "welcome-to-asmblog", "views": 8, "likes": 4}, "GET stats must not increment")
         st_sa, _, bsa = http_req("/api/stats")
         assert_eq(st_sa, 200, "GET /api/stats")
         sa_obj = json.loads(bsa)
-        assert sa_obj["total_views"] >= 1 and sa_obj["total_likes"] >= 1
+        assert_eq(sa_obj["total_views"], 12, "total_views (8 + 4, bad line skipped)")
+        assert_eq(sa_obj["total_likes"], 5, "total_likes (4 + 1, bad line skipped)")
         assert_eq(http_req("/api/stats/view", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "no-such-slug"}).encode())[0], 404, "nonexistent slug view -> 404")
         assert_eq(http_req("/api/stats/view", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "../evil"}).encode())[0], 400, "unsafe slug view -> 400")
-        assert os.path.isfile(stats_path) and "welcome-to-asmblog 1 1" in open(stats_path, encoding="utf-8").read()
+        assert os.path.isfile(stats_path) and "welcome-to-asmblog 8 4" in open(stats_path, encoding="utf-8").read()
 
         # 3d) Author Draft Live Preview (404 for guests, 200 no-store with banner for logged-in author!)
         draft_payload = {
@@ -856,7 +865,15 @@ def test_server():
                 assert req_arc in names, f"missing expected backup member {req_arc} in {sorted(names)}"
             assert all("/." not in n for n in names), f"hidden dotfile leaked into backup tar: {names}"
             assert_eq(tf.extractfile(f"asmblog-backup/content/uploads/{up_name}").read(), tiny_png, "backup PNG bytes exact match")
-            assert "welcome-to-asmblog 1 1" in tf.extractfile("asmblog-backup/content/stats.txt").read().decode("utf-8")
+            assert "welcome-to-asmblog 8 4" in tf.extractfile("asmblog-backup/content/stats.txt").read().decode("utf-8")
+
+        # Verify 60s sliding-window like anti-spam limiter triggers 429 + Retry-After: 60 after 30 likes
+        for _ in range(29):
+            st_lk, _, _ = http_req("/api/stats/like", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "welcome-to-asmblog"}).encode())
+            assert_eq(st_lk, 200, "like within 30/60s quota")
+        st_lk429, h_lk429, _ = http_req("/api/stats/like", method="POST", headers={"Content-Type": "application/json"}, data=json.dumps({"slug": "welcome-to-asmblog"}).encode())
+        assert_eq(st_lk429, 429, "31st like in 60s must return 429")
+        assert_eq(h_lk429.get("Retry-After"), "60", "like 429 Retry-After")
 
         # Reject protected/unsafe delete names; allow deleting unused & orphan .part
         for bad_n in (".gitkeep", "../config.ini", "a/b.png", "."):

@@ -1988,16 +1988,29 @@
 
   /* Moments / 碎碎念 Timeline (/moments/) */
   function formatMomentText(raw) {
-    var escaped = esc(raw || '');
-    escaped = escaped.replace(/(https?:\/\/[^\s<>"'）)，。！？；：、\]》】]+)/gi, function (u) {
+    var s = String(raw || '');
+    var re = /(https?:\/\/[^\s<>"'）)，。！？；：、\]》】]+)/gi;
+    var out = '';
+    var last = 0;
+    var m;
+    while ((m = re.exec(s)) !== null) {
+      if (m.index > last) out += esc(s.slice(last, m.index));
+      var u = m[0];
       var trail = '';
       while (/[.,;:!?]$/.test(u)) {
         trail = u.slice(-1) + trail;
         u = u.slice(0, -1);
       }
-      return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + u + '</a>' + trail;
-    });
-    return escaped.replace(/\n/g, '<br>');
+      if (/^https?:\/\/\S+/i.test(u)) {
+        var su = esc(u);
+        out += '<a href="' + su + '" target="_blank" rel="noopener noreferrer">' + su + '</a>' + esc(trail);
+      } else {
+        out += esc(m[0]);
+      }
+      last = re.lastIndex;
+    }
+    if (last < s.length) out += esc(s.slice(last));
+    return out.replace(/\n/g, '<br>');
   }
 
   function initMoments() {

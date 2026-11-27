@@ -1492,6 +1492,7 @@
     cats: [],
     moments: [],
     momImgs: [],
+    momUploading: 0,
     editingMomentId: '',
     statsMap: {},
     statsTotal: { views: 0, likes: 0 },
@@ -3932,14 +3933,19 @@
       return f && f.type && f.type.indexOf('image/') === 0;
     }).slice(0, remain);
     if (!imgs.length) return;
+    state.momUploading++;
+    if (momSubmitBtn) momSubmitBtn.disabled = true;
     momStatus.textContent = '正在上传 ' + imgs.length + ' 张配图...';
     var chain = Promise.resolve();
     imgs.forEach(function (file, idx) {
       chain = chain.then(function () {
+        if (state.momImgs.length >= 9) return;
         momStatus.textContent = '上传配图 (' + (idx + 1) + '/' + imgs.length + ')...';
         return uploadImageFile(file).then(function (url) {
-          state.momImgs.push(url);
-          renderMomImgsPreview();
+          if (state.momImgs.length < 9) {
+            state.momImgs.push(url);
+            renderMomImgsPreview();
+          }
         });
       });
     });
@@ -3948,10 +3954,18 @@
       .catch(function (err) {
         momStatus.textContent = '';
         showToast(esc(err.message), true);
+      })
+      .finally(function () {
+        state.momUploading = Math.max(0, state.momUploading - 1);
+        if (momSubmitBtn && state.momUploading === 0) momSubmitBtn.disabled = false;
       });
   }
 
   function submitMoment() {
+    if (state.momUploading > 0) {
+      showToast('配图正在上传中，请稍候完成再发送～', true);
+      return;
+    }
     var txt = (momText.value || '').trim();
     if (!txt && !state.momImgs.length) {
       showToast('写点文字或配一张图片再发送吧～', true);
@@ -4078,38 +4092,36 @@
   }
 
   /* =========================================================
-     One-Click Full Site Backup Download (.tar)
+     One-Click Full Site Backup Download (.tar, native streaming)
      ========================================================= */
   var backupDownloadBtn = document.getElementById('backup-download-btn');
   var backupStatus = document.getElementById('backup-status');
   if (backupDownloadBtn) {
     backupDownloadBtn.addEventListener('click', function () {
       backupDownloadBtn.disabled = true;
-      if (backupStatus) backupStatus.textContent = '正在实时打包整站数据...';
-      fetch('/api/studio/backup', { credentials: 'same-origin', cache: 'no-store' })
-        .then(function (r) {
-          if (r.status === 401) { showGate(); throw new Error('登录已过期，请重新解锁'); }
-          if (!r.ok) throw new Error('打包失败 (' + r.status + ')');
-          return r.blob();
-        })
-        .then(function (blob) {
+      if (backupStatus) backupStatus.textContent = '正在校验会话并准备流式打包...';
+      // Verify session first via lightweight API so expired auth never downloads 401 JSON as .tar,
+      // then trigger native browser streaming download (zero JS RAM buffering on large video sites!)
+      api('GET', '/api/studio/settings')
+        .then(function () {
           var fname = 'asmblog-backup-' + todayStr() + '.tar';
-          var url = URL.createObjectURL(blob);
           var a = document.createElement('a');
-          a.href = url;
+          a.href = '/api/studio/backup';
           a.download = fname;
+          a.rel = 'noopener';
           document.body.appendChild(a);
           a.click();
           a.remove();
-          setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
-          if (backupStatus) backupStatus.textContent = '已导出 ' + fmtBytes(blob.size) + ' ✦';
-          showToast('整站备份已开始下载（' + esc(fname) + ' · ' + fmtBytes(blob.size) + '）✦');
+          if (backupStatus) backupStatus.textContent = '已发起整站打包下载 ✦';
+          showToast('整站备份已开始下载（' + esc(fname) + '）✦');
         })
         .catch(function (err) {
           if (backupStatus) backupStatus.textContent = '';
           showToast(esc(err.message), true);
         })
-        .finally(function () { backupDownloadBtn.disabled = false; });
+        .finally(function () {
+          setTimeout(function () { backupDownloadBtn.disabled = false; }, 1200);
+        });
     });
   }
 
